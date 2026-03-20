@@ -1,0 +1,56 @@
+% Chapter 5: Meta-Learning in Multi-Agent RL (compact)
+
+\chapter{Meta-Learning in Multi-Agent Reinforcement Learning}
+\label{ch:meta-learning}
+
+We now extend the single-agent framework to environments with multiple interacting agents. The central difficulty is \emph{non-stationarity}: each agent's environment includes the other agents' policies, which change during learning.
+
+\section{Stochastic Games}
+\label{sec:stochastic-games}
+
+\begin{definition}[Stochastic game]\label{def:stochastic-game}
+An $n$-agent stochastic game is a tuple $\mathcal{M}_n = \langle \mathcal{I},\mathcal{S},\bm{\mathcal{A}},\mathcal{P},\bm{\mathcal{R}},\gamma\rangle$, where $\mathcal{I}=\{1,\ldots,n\}$ is the agent set, $\bm{\mathcal{A}}=\mathcal{A}^1\times\cdots\times\mathcal{A}^n$ is the joint action space, $\mathcal{P}(s'\mid s,\bm{a})$ gives transition probabilities under \emph{joint} actions $\bm{a}=(a^1,\ldots,a^n)$, and $\mathcal{R}^i\colon\mathcal{S}\times\bm{\mathcal{A}}\to\mathbb{R}$ is agent~$i$'s reward. When $n=1$ this reduces to an MDP.
+\end{definition}
+
+Each agent~$i$ has a parameterised policy $\pi^i(a^i\mid s,\bm{\phi}^i)$ with $\bm{\phi}^i\in\mathbb{R}^{d_i}$. We write $\bm{\phi}=(\bm{\phi}^i,\bm{\phi}^{-i})$ for the joint parameters. Following~\cite{wen2019}, actions are conditionally independent given the state: $\pi(\bm{a}\mid s,\bm{\phi})=\prod_j\pi^j(a^j\mid s,\bm{\phi}^j)$. Agent~$i$'s value function is
+\begin{equation}\label{eq:multi-agent-value}
+  V^i_{\bm{\phi}}(s_0) = \E\!\left[\sum_{t=0}^H\gamma^t r_t^i\;\Big|\;\bm{\phi}\right] = \E\!\left[G^i(\tau_{\bm{\phi}})\right].
+\end{equation}
+
+\section{Non-Stationarity and the Markov Chain of Policies}
+\label{sec:non-stationarity}
+
+A standard ``independent'' learner applies the single-agent PGT to its own objective, treating $\bm{\phi}^{-i}$ as fixed. This ignores a fundamental coupling: when all agents learn simultaneously, each agent's gradient step alters the shared trajectory distribution, affecting every other agent's update.
+
+Following~\cite{kim2021policygradientalgorithmlearning}, we model this as a \emph{Markov chain of joint policies}. Starting from~$\bm{\phi}_0$, each agent updates via a Markovian rule after collecting trajectories:
+\begin{equation}\label{eq:inner-loop}
+  \bm{\phi}_{\ell+1}^i = \bm{\phi}_\ell^i + \alpha^i\,\nabla_{\bm{\phi}_\ell^i}\E\!\left[G^i(\tau_{\bm{\phi}_\ell})\right],
+\end{equation}
+producing a chain $\bm{\phi}_0\xrightarrow{\tau_0}\bm{\phi}_1\xrightarrow{\tau_1}\cdots\xrightarrow{\tau_{L-1}}\bm{\phi}_L$. The \emph{meta-value function} evaluates agent~$i$'s return at step~$\ell+1$ of this chain:
+\begin{equation}\label{eq:meta-value}
+  V^i_{\bm{\phi}_{0:\ell+1}}(s_0) = \E\!\left[G^i(\tau_{\ell+1})\;\Big|\;\bm{\phi}_0\right],
+\end{equation}
+where the expectation is over all intermediate trajectories. The meta-objective is to choose~$\bm{\phi}_0^i$ to maximise adaptation performance over the chain.
+
+\section{Prior Approaches}
+\label{sec:prior-approaches}
+
+\paragraph{LOLA}~\cite{foerster2018lola} anticipates the opponent's next gradient step: agent~$i$ optimises $V^i(\bm{\phi}^i,\bm{\phi}^{-i}+\Delta\bm{\phi}^{-i})$ where $\Delta\bm{\phi}^{-i}=\alpha^{-i}\nabla_{\bm{\phi}^{-i}}V^{-i}$, using a first-order Taylor expansion. This captures the \emph{peer-learning} effect (how $\bm{\phi}^i$ influences $\bm{\phi}^{-i}$) but ignores the agent's \emph{own} multi-step learning dynamics.
+
+\paragraph{Meta-PG}~\cite{alshedivat2018} takes the complementary approach: it optimises over the agent's own learning chain but assumes $\partial\bm{\phi}_{\ell+1}^{-i}/\partial\bm{\phi}_0^i=\bm{0}$, ignoring the cross-agent coupling through shared trajectories.
+
+\medskip
+\begin{center}
+\begin{tabular}{lcc}
+  \hline
+  \textbf{Method} & \textbf{Own learning} & \textbf{Peer learning} \\
+  \hline
+  Independent PG & \texttimes & \texttimes \\
+  LOLA & \texttimes & $\approx$ (1-step) \\
+  Meta-PG & \checkmark & \texttimes \\
+  Meta-MAPG & \checkmark & \checkmark\ (exact) \\
+  \hline
+\end{tabular}
+\end{center}
+
+\medskip\noindent Neither method provides the complete gradient. The Meta-MAPG theorem, proved in the next chapter, fills this gap.

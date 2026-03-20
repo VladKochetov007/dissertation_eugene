@@ -1,0 +1,74 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Background and Setup}{3}{section.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.1}The Meta-MAPG Three-Term Gradient}{3}{subsection.1.1}\protected@file@percent }
+\newlabel{eq:meta-mapg}{{1}{3}{The Meta-MAPG Three-Term Gradient}{equation.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2}Game Environments}{3}{subsection.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.3}Implementation}{4}{subsection.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}Experiments 1--4: Baseline Results}{5}{section.2}\protected@file@percent }
+\newlabel{sec:baseline}{{2}{5}{Experiments 1--4: Baseline Results}{section.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Experiment 1: Matching Pennies}{5}{subsection.2.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Policy convergence in Matching Pennies. Meta-MAPG converges closest to Nash ($p = 0.5$). Independent PG oscillates and diverges.}}{5}{figure.caption.2}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:mp-convergence}{{1}{5}{Policy convergence in Matching Pennies. Meta-MAPG converges closest to Nash ($p = 0.5$). Independent PG oscillates and diverges}{figure.caption.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Phase portrait in policy space. Meta-MAPG spirals inward toward Nash (black X). Independent PG spirals outward. LOLA and Meta-PG converge but more slowly.}}{5}{figure.caption.3}\protected@file@percent }
+\newlabel{fig:mp-phase}{{2}{5}{Phase portrait in policy space. Meta-MAPG spirals inward toward Nash (black X). Independent PG spirals outward. LOLA and Meta-PG converge but more slowly}{figure.caption.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Experiment 2: Prisoner's Dilemma}{6}{subsection.2.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Prisoner's Dilemma. All methods converge to near-defection in this one-shot setting, since $(D, D)$ is the unique Nash equilibrium. Meta-MAPG and Meta-PG achieve marginally higher cooperation ($\approx 5.7\%$) vs.\ Independent PG ($\approx 0.7\%$).}}{6}{figure.caption.4}\protected@file@percent }
+\newlabel{fig:pd}{{3}{6}{Prisoner's Dilemma. All methods converge to near-defection in this one-shot setting, since $(D, D)$ is the unique Nash equilibrium. Meta-MAPG and Meta-PG achieve marginally higher cooperation ($\approx 5.7\%$) vs.\ Independent PG ($\approx 0.7\%$)}{figure.caption.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Experiment 3: Lookahead Sensitivity}{6}{subsection.2.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Effect of lookahead depth $L$ on Meta-MAPG convergence in Matching Pennies. Higher $L$ generally improves convergence speed, with diminishing returns beyond $L = 5$.}}{6}{figure.caption.5}\protected@file@percent }
+\newlabel{fig:lookahead}{{4}{6}{Effect of lookahead depth $L$ on Meta-MAPG convergence in Matching Pennies. Higher $L$ generally improves convergence speed, with diminishing returns beyond $L = 5$}{figure.caption.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Experiment 4: Initial Condition Robustness}{7}{subsection.2.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Eight random initial conditions in Matching Pennies. Independent PG trajectories diverge chaotically. Meta-MAPG trajectories all converge toward Nash regardless of initialisation.}}{7}{figure.caption.6}\protected@file@percent }
+\newlabel{fig:init-cond}{{5}{7}{Eight random initial conditions in Matching Pennies. Independent PG trajectories diverge chaotically. Meta-MAPG trajectories all converge toward Nash regardless of initialisation}{figure.caption.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5}Baseline Numerical Summary}{7}{subsection.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Experiment 5: Gradient Term Decomposition}{8}{section.3}\protected@file@percent }
+\newlabel{sec:decomposition}{{3}{8}{Experiment 5: Gradient Term Decomposition}{section.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Gradient term decomposition across five games. Top-left to bottom-middle: time series of $|\text  {Term}|$ on symlog scale. Bottom-right: average proportions. In Matching Pennies, Term 3 (peer-learning) dominates. In Prisoner's Dilemma, Term 1 (direct) accounts for $>80\%$. Chicken shows the most balanced mix.}}{8}{figure.caption.7}\protected@file@percent }
+\newlabel{fig:decomp}{{6}{8}{Gradient term decomposition across five games. Top-left to bottom-middle: time series of $|\text {Term}|$ on symlog scale. Bottom-right: average proportions. In Matching Pennies, Term 3 (peer-learning) dominates. In Prisoner's Dilemma, Term 1 (direct) accounts for $>80\%$. Chicken shows the most balanced mix}{figure.caption.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Interpretation}{8}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Experiment 6: Extended Game Suite}{10}{section.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Policy and return convergence across Stag Hunt, Chicken, and Battle of the Sexes. Top row: Agent 1's policy. Bottom row: Agent 1's expected return.}}{10}{figure.caption.8}\protected@file@percent }
+\newlabel{fig:extended}{{7}{10}{Policy and return convergence across Stag Hunt, Chicken, and Battle of the Sexes. Top row: Agent 1's policy. Bottom row: Agent 1's expected return}{figure.caption.8}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Experiments 7--8: N-Agent Games}{11}{section.5}\protected@file@percent }
+\newlabel{sec:nagent}{{5}{11}{Experiments 7--8: N-Agent Games}{section.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Experiment 7: N-Agent Public Goods}{11}{subsection.5.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces N-Agent Public Goods with $N \in \{3, 5, 7\}$, multiplier $m = 1.8$. Top: mean cooperation probability. Bottom: mean expected return. Meta-MAPG (blue) sustains higher cooperation and returns than Independent PG (red) across all group sizes. LOLA (green, for $N \leq 5$) is intermediate.}}{11}{figure.caption.9}\protected@file@percent }
+\newlabel{fig:npg}{{8}{11}{N-Agent Public Goods with $N \in \{3, 5, 7\}$, multiplier $m = 1.8$. Top: mean cooperation probability. Bottom: mean expected return. Meta-MAPG (blue) sustains higher cooperation and returns than Independent PG (red) across all group sizes. LOLA (green, for $N \leq 5$) is intermediate}{figure.caption.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Experiment 8: N-Agent Stag Hunt with Thresholds}{12}{subsection.5.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces 5-Agent Stag Hunt with varying cooperation thresholds. Top: individual Meta-MAPG agent trajectories. Bottom: mean cooperation comparison. Lower thresholds ($T = 2, 3$) permit partial cooperation; full unanimity ($T = 5$) prevents it entirely.}}{12}{figure.caption.10}\protected@file@percent }
+\newlabel{fig:nsh}{{9}{12}{5-Agent Stag Hunt with varying cooperation thresholds. Top: individual Meta-MAPG agent trajectories. Bottom: mean cooperation comparison. Lower thresholds ($T = 2, 3$) permit partial cooperation; full unanimity ($T = 5$) prevents it entirely}{figure.caption.10}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Experiment 9: Stochastic vs Exact Gradients}{13}{section.6}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Exact analytic gradients vs.\ REINFORCE-based sample gradients at batch sizes $B \in \{16, 64, 256\}$. Stochastic methods converge to the same fixed points but with higher variance and slower speed.}}{13}{figure.caption.11}\protected@file@percent }
+\newlabel{fig:stochastic}{{10}{13}{Exact analytic gradients vs.\ REINFORCE-based sample gradients at batch sizes $B \in \{16, 64, 256\}$. Stochastic methods converge to the same fixed points but with higher variance and slower speed}{figure.caption.11}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Experiment 10: Learning Rate Landscape}{14}{section.7}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Left: Meta-MAPG distance from Nash in Matching Pennies as a function of $(\alpha _\text  {inner}, \alpha _\text  {outer})$, with white contour at $d < 0.05$. The stable region requires $\alpha _\text  {inner} \gtrsim 0.1$. Right: Cooperation level in Prisoner's Dilemma --- uniformly low, confirming the one-shot limitation.}}{14}{figure.caption.12}\protected@file@percent }
+\newlabel{fig:lr}{{11}{14}{Left: Meta-MAPG distance from Nash in Matching Pennies as a function of $(\alpha _\text {inner}, \alpha _\text {outer})$, with white contour at $d < 0.05$. The stable region requires $\alpha _\text {inner} \gtrsim 0.1$. Right: Cooperation level in Prisoner's Dilemma --- uniformly low, confirming the one-shot limitation}{figure.caption.12}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {8}Experiment 11: Convergence Rate Quantification}{15}{section.8}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces Distance from Nash equilibrium over time (log scale). Meta-MAPG is the only method to enter the $\varepsilon = 0.1$ ball.}}{15}{figure.caption.13}\protected@file@percent }
+\newlabel{fig:conv}{{12}{15}{Distance from Nash equilibrium over time (log scale). Meta-MAPG is the only method to enter the $\varepsilon = 0.1$ ball}{figure.caption.13}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {9}Experiments 12--13: Term Dynamics and Jacobian Evolution}{16}{section.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.1}Experiment 12: Stacked Area --- Term Proportions Over Time}{16}{subsection.9.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Stacked area chart of gradient term proportions over training. Left: Matching Pennies --- Term 3 (green) surges around step 200 when Term 1 drops near zero. Centre: Stag Hunt --- Term 2 (orange) gradually grows. Right: Chicken --- relatively stable mix with Term 3 growing late.}}{16}{figure.caption.14}\protected@file@percent }
+\newlabel{fig:dynamics}{{13}{16}{Stacked area chart of gradient term proportions over training. Left: Matching Pennies --- Term 3 (green) surges around step 200 when Term 1 drops near zero. Centre: Stag Hunt --- Term 2 (orange) gradually grows. Right: Chicken --- relatively stable mix with Term 3 growing late}{figure.caption.14}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.2}Experiment 13: Jacobian Evolution}{16}{subsection.9.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces Top: Jacobian values $J_{11}$ (own-learning) and $J_{21}$ (peer-learning) over training. Bottom: peer/own influence ratio $|J_{21}/J_{11}|$.}}{16}{figure.caption.15}\protected@file@percent }
+\newlabel{fig:jacobian}{{14}{16}{Top: Jacobian values $J_{11}$ (own-learning) and $J_{21}$ (peer-learning) over training. Bottom: peer/own influence ratio $|J_{21}/J_{11}|$}{figure.caption.15}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {10}Experiment 14: Ablation Study}{18}{section.10}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {15}{\ignorespaces Ablation across four games. Top: phase portraits with each method's trajectory. Bottom: social welfare ($V^1 + V^2$) over time. Labels indicate which terms each method uses.}}{18}{figure.caption.16}\protected@file@percent }
+\newlabel{fig:ablation}{{15}{18}{Ablation across four games. Top: phase portraits with each method's trajectory. Bottom: social welfare ($V^1 + V^2$) over time. Labels indicate which terms each method uses}{figure.caption.16}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {11}Experiment 15: N-Agent Term Decomposition}{19}{section.11}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {16}{\ignorespaces Gradient term norms in N-agent Public Goods for $N \in \{3, 5, 7\}$. As $N$ increases, Term 3 (peer-learning) grows relative to Term 1, reflecting the increasing importance of modelling multiple peers.}}{19}{figure.caption.17}\protected@file@percent }
+\newlabel{fig:nterms}{{16}{19}{Gradient term norms in N-agent Public Goods for $N \in \{3, 5, 7\}$. As $N$ increases, Term 3 (peer-learning) grows relative to Term 1, reflecting the increasing importance of modelling multiple peers}{figure.caption.17}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {12}Extended Numerical Summary}{20}{section.12}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Final-state comparison across all games and methods (500 steps).}}{20}{table.caption.18}\protected@file@percent }
+\newlabel{tab:summary}{{1}{20}{Final-state comparison across all games and methods (500 steps)}{table.caption.18}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {13}Discussion and Limitations}{21}{section.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {13.1}What the Experiments Show}{21}{subsection.13.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {13.2}Limitations}{21}{subsection.13.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {13.3}Implications for LLM Steering}{21}{subsection.13.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {14}Appendix: Code Structure}{22}{section.14}\protected@file@percent }
+\gdef \@abspage@last{22}

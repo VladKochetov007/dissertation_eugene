@@ -1,0 +1,488 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{enumerate}
+\usepackage{hyperref}
+\usepackage{cleveref}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+
+\DeclareMathOperator{\proj}{proj}
+\DeclareMathOperator{\AM}{AM}
+\DeclareMathOperator{\HM}{HM}
+\DeclareMathOperator{\diag}{diag}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\cF}{\mathcal{F}}
+\newcommand{\cG}{\mathcal{G}}
+\newcommand{\cU}{\mathcal{U}}
+\newcommand{\cE}{\mathcal{E}}
+\newcommand{\cB}{\mathcal{B}}
+\newcommand{\ip}[2]{\langle #1, #2 \rangle}
+
+\title{Evidence-Weighted Policy Gradient Convergence\\in General Stochastic Games}
+\author{Eugene Shcherbinin\\
+\small BSc Mathematics, London School of Economics\\
+\small Candidate 007}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We introduce an \emph{evidence-weighted} variant of the policy gradient method for multi-agent learning in general stochastic games. Building on the convergence framework of Giannou, Lotidis, Mertikopoulos, and Vlatakis-Gkaragkounis (2022), we show that when agents scale their gradient updates by a Keynesian weight of evidence $V_i$, the effective variance in the Lyapunov convergence analysis improves by a factor of $\HM(V)/\AM(V) \leq 1$, where $\HM$ and $\AM$ denote the harmonic and arithmetic means of the evidence weights across agents. The convergence rate exponent is preserved at $\mathcal{O}(1/\sqrt{n})$ for REINFORCE, but the leading constant is strictly tighter whenever agents have heterogeneous evidence quality. The evidence-weighting scheme arises naturally from the Keynesian loss function in the $\Omega$-framework, connecting multi-agent reinforcement learning to the epistemology of incomplete knowledge.
+\end{abstract}
+
+\tableofcontents
+
+%% ========================================================================
+\section{Setup and Notation}
+\label{sec:setup}
+%% ========================================================================
+
+We adopt the stochastic game framework of Giannou et al.\ \cite{giannou2022}. An $N$-player stochastic game $\cG = (\mathcal{S}, \mathcal{N}, \{\mathcal{A}_i\}_{i \in \mathcal{N}}, P, \zeta, \rho)$ consists of:
+\begin{itemize}
+    \item A finite set of agents $\mathcal{N} = \{1, \ldots, N\}$ and states $\mathcal{S} = \{1, \ldots, S\}$.
+    \item For each agent $i$, a finite action space $\mathcal{A}_i$ with $|\mathcal{A}_i| = A_i$.
+    \item Reward functions $R_i : \mathcal{S} \times \mathcal{A} \to [-1, 1]$.
+    \item Markov transition kernel $P(\cdot \mid s, \alpha)$ and termination probabilities $\zeta_{s,\alpha} > 0$.
+    \item Initial state distribution $\rho \in \Delta(\mathcal{S})$.
+\end{itemize}
+
+A \emph{stationary Markovian policy} for agent $i$ is a map $\pi_i : \mathcal{S} \to \Delta(\mathcal{A}_i)$. We write $\Pi_i := \Delta(\mathcal{A}_i)^S$ for agent $i$'s policy space, $\Pi := \prod_i \Pi_i$ for the joint policy space, and $\pi = (\pi_i)_{i \in \mathcal{N}} \in \Pi$ for a joint policy profile.
+
+The value function of agent $i$ under profile $\pi$ starting from state $s$ is:
+\begin{equation}
+    V_{i,s}(\pi) := \E_{\tau \sim \text{MDP}} \left[ \sum_{t=0}^{T(\tau)} R_i(s_t, \alpha_t) \;\middle|\; s_0 = s \right].
+\end{equation}
+We write $v_i(\pi) = \nabla_i V_{i,\rho}(\pi)$ for the individual policy gradient and $v(\pi) = (v_i(\pi))_{i \in \mathcal{N}}$ for the ensemble.
+
+\begin{definition}[Nash equilibrium, stability, SOS --- Giannou et al.\ Def.\ 1--2]
+\label{def:nash}
+A policy $\pi^* = (\pi_i^*)_{i \in \mathcal{N}} \in \Pi$ is:
+\begin{enumerate}[(a)]
+    \item \emph{Nash} if $V_{i,\rho}(\pi_i^*; \pi_{-i}^*) \geq V_{i,\rho}(\pi_i; \pi_{-i}^*)$ for all $i$ and all $\pi_i \in \Delta(\mathcal{A}_i)^S$.
+    \item \emph{Stable} if $\ip{v(\pi)}{\pi - \pi^*} < 0$ for all $\pi \neq \pi^*$ sufficiently close.
+    \item \emph{Second-order stationary (SOS)} if there exists $\mu > 0$ such that
+    \begin{equation}
+    \label{eq:sos}
+        \ip{v(\pi)}{\pi - \pi^*} \leq -\mu \|\pi - \pi^*\|^2 \quad \text{for all } \pi \text{ sufficiently close to } \pi^*.
+    \end{equation}
+\end{enumerate}
+\end{definition}
+
+
+%% ========================================================================
+\section{Standard Policy Gradient and Giannou's Results}
+\label{sec:standard-pg}
+%% ========================================================================
+
+\subsection{The PG template}
+
+At each episode $n = 1, 2, \ldots$, agents update their joint policy via:
+\begin{equation}
+\label{eq:pg}
+\tag{PG}
+    \pi_{n+1} = \proj_\Pi(\pi_n + \gamma_n \hat{v}_n),
+\end{equation}
+where $\gamma_n > 0$ is the step size and $\hat{v}_n$ is a gradient estimate. The signal decomposes as:
+\begin{equation}
+\label{eq:signal-decomp}
+    \hat{v}_n = v(\pi_n) + U_n + b_n,
+\end{equation}
+with $U_n = \hat{v}_n - \E[\hat{v}_n \mid \cF_n]$ (zero-mean noise) and $b_n = \E[\hat{v}_n \mid \cF_n] - v(\pi_n)$ (bias). These satisfy:
+\begin{equation}
+\label{eq:bias-variance}
+    \E[\|b_n\| \mid \cF_n] \leq B_n, \qquad \E[\|U_n\|^2 \mid \cF_n] \leq \sigma_n^2,
+\end{equation}
+with $B_n = \mathcal{O}(1/n^{\ell_b})$ and $\sigma_n^2 = \mathcal{O}(n^{\ell_\sigma})$.
+
+\subsection{Giannou's convergence results}
+
+\begin{theorem}[Giannou et al.\ Theorem 1 --- Convergence to stable Nash]
+\label{thm:giannou1}
+Let $\pi^*$ be a stable Nash policy and $\gamma_n = \gamma/(n+m)^p$ with $p \in (1/2, 1]$, $p + \ell_b > 1$, $p - \ell_\sigma > 1/2$. Then for any $\delta > 0$, there exists a neighbourhood $\cU$ of $\pi^*$ such that
+\[
+    \Prob(\pi_n \to \pi^* \mid \pi_1 \in \cU) \geq 1 - \delta,
+\]
+provided $\gamma$ is small enough relative to $\delta$.
+\end{theorem}
+
+\begin{theorem}[Giannou et al.\ Theorem 2 --- Rate for SOS Nash]
+\label{thm:giannou2}
+Under the same hypotheses with $\pi^*$ SOS (parameter $\mu > 0$), the convergence rate is:
+\[
+    \E\bigl[\|\pi_n - \pi^*\|^2 \mid \cE\bigr] = \begin{cases}
+        \mathcal{O}(1/n^{2\mu\gamma}) & \text{if } p = 1 \text{ and } 2\mu\gamma < q, \\
+        \mathcal{O}(1/n^q) & \text{otherwise},
+    \end{cases}
+\]
+where $q = \min\{\ell_b, p - 2\ell_\sigma\}$. For REINFORCE (Model 3) with $p = 1$, this gives $\mathcal{O}(1/\sqrt{n})$.
+\end{theorem}
+
+The proof rests on the \emph{Lyapunov function}:
+\begin{equation}
+\label{eq:lyapunov}
+    D_n := \frac{1}{2}\|\pi_n - \pi^*\|^2,
+\end{equation}
+satisfying the \emph{energy inequality} (Giannou Lemma A.1):
+\begin{equation}
+\label{eq:energy-std}
+\boxed{
+    D_{n+1} \leq D_n + \gamma_n \ip{v(\pi_n)}{\pi_n - \pi^*} + \gamma_n \xi_n + \gamma_n \chi_n + \gamma_n^2 \psi_n^2,
+}
+\end{equation}
+where $\xi_n = \ip{U_n}{\pi_n - \pi^*}$, $\chi_n = \|\Pi\| B_n$, and $\psi_n^2 = \tfrac{1}{2}\|\hat{v}_n\|^2$.
+
+
+%% ========================================================================
+\section{Evidence-Weighted Policy Gradient}
+\label{sec:ewpg}
+%% ========================================================================
+
+\subsection{Motivation from the $\Omega$-framework}
+
+In the $\Omega$-framework (theos, items 30--31), each agent $i$ maintains a \emph{Keynesian weight of evidence} $V_i(\mathcal{X})$ measuring how much data supports its predictions about observation $\mathcal{X} \in O$. The \emph{Keynesian loss} augments the standard prediction loss with a fragility penalty:
+\begin{equation}
+\label{eq:keynesian-loss}
+    \mathcal{L}_K(Y, \hat{Y}, V) = \underbrace{\mathcal{L}(Y, \hat{Y})}_{\text{prediction error}} + \mu \cdot \underbrace{V^{-1}}_{\text{fragility penalty}},
+\end{equation}
+whose gradient decomposes as (theos eq.\ 11):
+\begin{equation}
+\label{eq:keynesian-gradient}
+    \nabla_\theta \mathcal{L}_K = \underbrace{\nabla_\theta \mathcal{L}(Y, \hat{Y})}_{\text{prediction improvement}} - \underbrace{\mu V^{-2} \nabla_\theta V}_{\text{evidence seeking}}.
+\end{equation}
+
+The fragility penalty $V^{-1}$ implies that agents with \emph{low evidence should be conservative}: they should take smaller steps to avoid acting on unreliable gradient estimates.
+
+\subsection{The algorithm}
+
+\begin{definition}[Evidence-weighted PG]
+\label{def:ewpg}
+Let $w_{i,n} \in [w_{\min}, 1]$ be an $\cF_n$-measurable \emph{evidence weight} for agent $i$ at episode $n$, with $w_{\min} > 0$. The \emph{evidence-weighted policy gradient} (EWPG) update is:
+\begin{equation}
+\label{eq:ewpg}
+\tag{EWPG}
+    \pi_{i,n+1} = \proj_{\Pi_i}\bigl(\pi_{i,n} + \gamma_n \cdot w_{i,n} \cdot \hat{v}_{i,n}\bigr) \quad \text{for each } i \in \mathcal{N}.
+\end{equation}
+\end{definition}
+
+In the joint policy space, writing $W_n = \diag(w_{1,n} I_{A_1 S}, \ldots, w_{N,n} I_{A_N S})$, this becomes:
+\begin{equation}
+    \pi_{n+1} = \proj_\Pi(\pi_n + \gamma_n W_n \hat{v}_n).
+\end{equation}
+
+\begin{remark}[Choice of evidence weight]
+\label{rem:weight-choice}
+The natural choice from the Keynesian framework is $w_{i,n} = V_{i,n} / \max_j V_{j,n}$, ensuring $w_{i,n} \in (0, 1]$. When all agents have equal evidence, $w_{i,n} = 1$ for all $i$ and EWPG reduces to standard PG. We discuss the optimal choice in \Cref{sec:optimal-weight}.
+\end{remark}
+
+
+%% ========================================================================
+\section{Modified Lyapunov Analysis}
+\label{sec:lyapunov}
+%% ========================================================================
+
+\subsection{The modified energy inequality}
+
+\begin{lemma}[Modified energy inequality]
+\label{lem:energy}
+Under EWPG \eqref{eq:ewpg}, the Lyapunov function \eqref{eq:lyapunov} satisfies:
+\begin{equation}
+\label{eq:energy-ewpg}
+\boxed{
+    D_{n+1} \leq D_n + \gamma_n \ip{W_n v(\pi_n)}{\pi_n - \pi^*} + \gamma_n \xi_n^w + \gamma_n \chi_n^w + \gamma_n^2 (\psi_n^w)^2,
+}
+\end{equation}
+where:
+\begin{align}
+    \xi_n^w &= \ip{W_n U_n}{\pi_n - \pi^*}, \label{eq:xi-w} \\
+    \chi_n^w &= \|\Pi\| \cdot \|W_n\| \cdot B_n, \label{eq:chi-w} \\
+    (\psi_n^w)^2 &= \tfrac{1}{2}\|W_n \hat{v}_n\|^2. \label{eq:psi-w}
+\end{align}
+\end{lemma}
+
+\begin{proof}
+By non-expansiveness of the projection $\proj_\Pi$:
+\begin{align}
+    D_{n+1} &= \frac{1}{2}\|\pi_{n+1} - \pi^*\|^2
+    = \frac{1}{2}\|\proj_\Pi(\pi_n + \gamma_n W_n \hat{v}_n) - \proj_\Pi(\pi^*)\|^2 \notag\\
+    &\leq \frac{1}{2}\|\pi_n + \gamma_n W_n \hat{v}_n - \pi^*\|^2 \notag\\
+    &= \frac{1}{2}\|\pi_n - \pi^*\|^2 + \gamma_n \ip{W_n \hat{v}_n}{\pi_n - \pi^*} + \frac{1}{2}\gamma_n^2 \|W_n \hat{v}_n\|^2 \notag\\
+    &= D_n + \gamma_n \ip{W_n(v(\pi_n) + U_n + b_n)}{\pi_n - \pi^*} + \frac{1}{2}\gamma_n^2 \|W_n \hat{v}_n\|^2. \label{eq:energy-expand}
+\end{align}
+Expanding the inner product and bounding $|\ip{W_n b_n}{\pi_n - \pi^*}| \leq \|W_n\| \cdot \|b_n\| \cdot \|\pi_n - \pi^*\| \leq \|\Pi\| \|W_n\| B_n$ by Cauchy--Schwarz gives the result.
+\end{proof}
+
+\subsection{Variance scaling}
+
+The key observation is how the noise term scales under evidence weighting.
+
+\begin{lemma}[Variance scaling]
+\label{lem:variance-scaling}
+For the weighted noise $W_n U_n$, the conditional variance satisfies:
+\begin{equation}
+\label{eq:var-scaling}
+    \E\bigl[\|W_n U_n\|^2 \mid \cF_n\bigr] = \sum_{i=1}^N w_{i,n}^2 \cdot \E\bigl[\|U_{i,n}\|^2 \mid \cF_n\bigr] \leq \sum_{i=1}^N w_{i,n}^2 \cdot \sigma_{i,n}^2.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Since $W_n = \diag(w_{1,n}, \ldots, w_{N,n})$ acts on the block-diagonal structure of the joint policy space, and $U_{i,n}$ are the per-agent noise components:
+\[
+    \|W_n U_n\|^2 = \sum_{i=1}^N \|w_{i,n} U_{i,n}\|^2 = \sum_{i=1}^N w_{i,n}^2 \|U_{i,n}\|^2.
+\]
+Taking conditional expectations and applying the variance bounds $\E[\|U_{i,n}\|^2 \mid \cF_n] \leq \sigma_{i,n}^2$ gives the result.
+\end{proof}
+
+
+%% ========================================================================
+\section{The AM-HM Variance Improvement}
+\label{sec:am-hm}
+%% ========================================================================
+
+This section contains our main new result: a precise quantification of the variance improvement from evidence weighting.
+
+\subsection{The Keynesian variance model}
+
+\begin{definition}[Keynesian variance]
+\label{def:keynesian-variance}
+Agent $i$'s gradient estimator has variance inversely proportional to its evidence weight:
+\begin{equation}
+\label{eq:keynesian-var}
+    \sigma_{i,n}^2 = \frac{C}{V_{i,n}},
+\end{equation}
+where $C > 0$ is a constant depending on game parameters (cf.\ Giannou Lemma 4, $C = 24A^2/\zeta^4$) and $V_{i,n} > 0$ is agent $i$'s Keynesian weight of evidence at episode $n$.
+\end{definition}
+
+This model captures the intuition that agents with less evidence produce noisier gradient estimates. It is the natural variance structure when the REINFORCE estimator is computed from observations weighted by evidence quality.
+
+\subsection{Unweighted vs.\ weighted total variance}
+
+Under the Keynesian model \eqref{eq:keynesian-var}:
+
+\paragraph{Unweighted (standard PG).} The total variance is:
+\begin{equation}
+\label{eq:var-unweighted}
+    \sigma_{\text{std}}^2 := \sum_{i=1}^N \sigma_{i,n}^2 = C \sum_{i=1}^N \frac{1}{V_{i,n}} = \frac{CN}{\HM(V_n)},
+\end{equation}
+where $\HM(V_n) := N / \sum_i V_{i,n}^{-1}$ is the harmonic mean of the evidence weights.
+
+\paragraph{Evidence-weighted (EWPG with $w_{i,n} = V_{i,n}/\bar{V}_n$).} Setting $\bar{V}_n = \frac{1}{N}\sum_j V_{j,n} = \AM(V_n)$, the weighted total variance is:
+\begin{equation}
+\label{eq:var-weighted}
+    \sigma_w^2 := \sum_{i=1}^N w_{i,n}^2 \cdot \sigma_{i,n}^2 = \sum_{i=1}^N \frac{V_{i,n}^2}{\bar{V}_n^2} \cdot \frac{C}{V_{i,n}} = \frac{C}{\bar{V}_n^2} \sum_{i=1}^N V_{i,n} = \frac{CN}{\AM(V_n)}.
+\end{equation}
+
+\subsection{The main result}
+
+\begin{theorem}[AM-HM variance improvement]
+\label{thm:am-hm}
+Under the Keynesian variance model \eqref{eq:keynesian-var} and the evidence weight $w_{i,n} = V_{i,n}/\bar{V}_n$, the ratio of weighted to unweighted total variance is:
+\begin{equation}
+\label{eq:improvement}
+\boxed{
+    \frac{\sigma_w^2}{\sigma_{\mathrm{std}}^2} = \frac{\HM(V_n)}{\AM(V_n)} \leq 1.
+}
+\end{equation}
+Equality holds if and only if $V_{1,n} = V_{2,n} = \cdots = V_{N,n}$.
+\end{theorem}
+
+\begin{proof}
+From \eqref{eq:var-unweighted} and \eqref{eq:var-weighted}:
+\[
+    \frac{\sigma_w^2}{\sigma_{\text{std}}^2} = \frac{CN / \AM(V_n)}{CN / \HM(V_n)} = \frac{\HM(V_n)}{\AM(V_n)}.
+\]
+The inequality $\HM \leq \AM$ is the \emph{AM-HM inequality}, which follows from the Cauchy--Schwarz inequality applied to the vectors $(\sqrt{V_1}, \ldots, \sqrt{V_N})$ and $(1/\sqrt{V_1}, \ldots, 1/\sqrt{V_N})$:
+\[
+    N^2 = \left(\sum_{i=1}^N 1\right)^2 = \left(\sum_{i=1}^N \sqrt{V_i} \cdot \frac{1}{\sqrt{V_i}}\right)^2 \leq \left(\sum_{i=1}^N V_i\right)\left(\sum_{i=1}^N \frac{1}{V_i}\right),
+\]
+which rearranges to $\HM(V) \leq \AM(V)$. Equality in Cauchy--Schwarz holds iff $\sqrt{V_i} / (1/\sqrt{V_i}) = V_i$ is constant across $i$.
+\end{proof}
+
+\begin{remark}[Magnitude of improvement]
+\label{rem:magnitude}
+For $N = 2$ agents with evidence ratio $r = V_1/V_2 \geq 1$:
+\[
+    \frac{\HM}{\AM} = \frac{2r}{(1+r)^2/2} = \frac{4r}{(1+r)^2}.
+\]
+At $r = 1$ (equal evidence): ratio $= 1$ (no improvement). At $r = 10$: ratio $= 40/121 \approx 0.33$ (67\% variance reduction). The more heterogeneous the evidence, the larger the gain.
+\end{remark}
+
+
+%% ========================================================================
+\section{Convergence of Evidence-Weighted PG}
+\label{sec:convergence}
+%% ========================================================================
+
+\begin{theorem}[Convergence of EWPG to SOS Nash]
+\label{thm:ewpg-convergence}
+Let $\pi^*$ be an SOS Nash policy with parameter $\mu > 0$. Let $\{\pi_n\}$ be the sequence generated by EWPG \eqref{eq:ewpg} with:
+\begin{enumerate}[(i)]
+    \item Step size $\gamma_n = \gamma/(n+m)^p$, $p \in (1/2, 1]$.
+    \item Evidence weights $w_{i,n} \in [w_{\min}, 1]$ with $w_{\min} > 0$, $\cF_n$-measurable.
+    \item Gradient estimates satisfying \eqref{eq:bias-variance} with $p + \ell_b > 1$ and $p - \ell_\sigma > 1/2$.
+\end{enumerate}
+Then:
+\begin{enumerate}[(1)]
+    \item There exists a neighbourhood $\cU$ of $\pi^*$ such that $\Prob(\pi_n \to \pi^* \mid \pi_1 \in \cU) \geq 1 - \delta$ for any $\delta > 0$, provided $\gamma$ is small enough.
+
+    \item The convergence rate is:
+    \begin{equation}
+    \label{eq:ewpg-rate}
+        \E\bigl[\|\pi_n - \pi^*\|^2 \mid \cE\bigr] = \mathcal{O}\!\left(\frac{C_w}{n^q}\right),
+    \end{equation}
+    where $q = \min\{\ell_b, p - 2\ell_\sigma\}$ and the constant $C_w$ satisfies:
+    \begin{equation}
+    \label{eq:constant-improvement}
+        \frac{C_w}{C_{\mathrm{std}}} = \frac{\HM(V)}{\AM(V)} \leq 1,
+    \end{equation}
+    with $C_{\mathrm{std}}$ being the constant from Giannou et al.\ Theorem 2.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+The proof follows the structure of Giannou et al.\ Appendices A--B, with the substitution $\gamma_n \to \gamma_n w_{i,n}$ for each agent $i$. We trace where the variance enters the bounds.
+
+\textbf{Step 1: Modified energy inequality.} By \Cref{lem:energy}, the Lyapunov function satisfies \eqref{eq:energy-ewpg}. Using the SOS condition \eqref{eq:sos}:
+\begin{equation}
+\label{eq:sos-contraction}
+    \ip{W_n v(\pi_n)}{\pi_n - \pi^*} \leq -\mu \sum_{i=1}^N w_{i,n} \|\pi_{i,n} - \pi_i^*\|^2 \leq -\mu w_{\min} \|\pi_n - \pi^*\|^2.
+\end{equation}
+This gives a contraction rate of $2\mu w_{\min} \gamma_n$ (compared to $2\mu\gamma_n$ in the standard analysis). The effective SOS parameter becomes $\mu_w := \mu \cdot w_{\min}$.
+
+\textbf{Step 2: Error control.} Following Giannou's Appendix A.2, we bound the cumulative error. The noise term $\xi_n^w$ has the same martingale property ($\E[\xi_n^w \mid \cF_n] = 0$) and the variance bound:
+\[
+    \E[(\xi_n^w)^2 \mid \cF_n] \leq \|\pi_n - \pi^*\|^2 \cdot \sum_{i=1}^N w_{i,n}^2 \sigma_{i,n}^2 = \|\pi_n - \pi^*\|^2 \cdot \sigma_w^2.
+\]
+By \Cref{thm:am-hm}, $\sigma_w^2 = (\HM/\AM) \cdot \sigma_{\text{std}}^2 \leq \sigma_{\text{std}}^2$.
+
+\textbf{Step 3: Convergence rate.} Following Giannou's Appendix B, the conditional Lyapunov bound becomes (cf.\ their eq.\ B.8):
+\begin{equation}
+    \bar{D}_{n+1} \leq \left(1 - \frac{2\mu_w \gamma}{(n+m)^p}\right) \bar{D}_n + \frac{C_1}{(n+m)^{p+\ell_b}} + \frac{C_2^w}{(n+m)^{2p-2\ell_\sigma}},
+\end{equation}
+where $C_2^w = (\HM/\AM) \cdot C_2^{\text{std}}$. The rest of the Chung lemma argument proceeds identically, yielding the rate $\mathcal{O}(C_w / n^q)$ with the improved constant.
+\end{proof}
+
+\begin{corollary}[REINFORCE with evidence weighting]
+\label{cor:reinforce}
+For $\varepsilon$-greedy REINFORCE (Giannou Algorithm 2) with evidence-weighted updates:
+\begin{enumerate}[(a)]
+    \item With $\gamma_n = \gamma/(n+m)$, $\varepsilon_n = \varepsilon/(n+m)^{1/2}$, the convergence rate is $\mathcal{O}(C_w / \sqrt{n})$.
+    \item The constant satisfies $C_w / C_{\mathrm{std}} = \HM(V)/\AM(V) \leq 1$.
+    \item For $N = 2$ agents with evidence ratio $r = V_1/V_2 = 10$, the leading constant is reduced by approximately $67\%$.
+\end{enumerate}
+\end{corollary}
+
+
+%% ========================================================================
+\section{Optimal Evidence Weight}
+\label{sec:optimal-weight}
+%% ========================================================================
+
+\begin{proposition}[Optimal evidence weight]
+\label{prop:optimal-weight}
+Under the Keynesian variance model $\sigma_{i,n}^2 = C/V_{i,n}$, the evidence weight that minimises the weighted total variance $\sigma_w^2 = \sum_i w_{i,n}^2 \sigma_{i,n}^2$ subject to the drift constraint $\sum_i w_{i,n} g_{i,n} = \sum_i g_{i,n}$ (where $g_{i,n} = \ip{v_i(\pi_n)}{\pi_{i,n} - \pi_i^*}$) is:
+\begin{equation}
+\label{eq:optimal-weight}
+    w_{i,n}^* \propto V_{i,n} \cdot g_{i,n}.
+\end{equation}
+When the per-agent drift terms $g_{i,n}$ are approximately equal, this simplifies to $w_{i,n}^* \propto V_{i,n}$, i.e.\ $w_{i,n} = V_{i,n} / \bar{V}_n$.
+\end{proposition}
+
+\begin{proof}
+Lagrangian: $L = \sum_i w_i^2 C / V_i - \lambda(\sum_i w_i g_i - \sum_i g_i)$. First-order condition:
+\[
+    \frac{\partial L}{\partial w_i} = \frac{2 w_i C}{V_i} - \lambda g_i = 0 \implies w_i = \frac{\lambda V_i g_i}{2C}.
+\]
+The constraint $\sum_i w_i g_i = \sum_i g_i$ determines $\lambda$. When $g_i \approx g$ for all $i$:
+\[
+    w_i = \frac{\lambda V_i g}{2C}, \quad \sum_i \frac{\lambda V_i g^2}{2C} = Ng \implies \lambda = \frac{2CN}{g \sum_i V_i},
+\]
+yielding $w_i = V_i N / \sum_j V_j = V_i / \bar{V}$.
+\end{proof}
+
+
+%% ========================================================================
+\section{Connection to the $\Omega$-Framework}
+\label{sec:omega}
+%% ========================================================================
+
+The evidence-weighted PG method instantiates several components of the $\Omega$-framework multi-agent gradient (theos eq.\ 27):
+\begin{equation}
+    \nabla_{\theta_i}^{\text{full}} R_{\text{multi}} = \omega_i \Bigl[\underbrace{\E[\mathcal{L}_i \cdot s_{\theta_i}]}_{\text{exploration}} + \underbrace{\E[\nabla_{\theta_i} \mathcal{L}_i]}_{\text{exploitation}}\Bigr] + \omega_i \mu \underbrace{(-V_i^{-2} \nabla_{\theta_i} V_i)}_{\text{evidence seeking}} + \lambda \underbrace{\nabla_{\theta_i} D}_{\text{alignment}} + \underbrace{\sum_{j \neq i} \frac{\partial R_i}{\partial \theta_j} \cdot \frac{\partial \theta_j'}{\partial \theta_i}}_{\text{opponent shaping}}.
+\end{equation}
+
+Our evidence-weighted PG captures the first three components:
+\begin{itemize}
+    \item The \textbf{exploration} and \textbf{exploitation} terms are the standard REINFORCE gradient $\hat{v}_{i,n}$.
+    \item The \textbf{evidence seeking} term is operationalised through the evidence weight $w_{i,n}$: by scaling the step size by $V_i$, agents implicitly optimise the Keynesian loss that trades prediction quality against evidentiary robustness.
+\end{itemize}
+
+The \textbf{alignment} and \textbf{opponent shaping} terms are not included in the current analysis. Extending \Cref{thm:ewpg-convergence} to incorporate LOLA-type opponent shaping (cf.\ Foerster et al.\ 2018) is a natural direction for future work.
+
+\paragraph{Gödelian complementarity made quantitative.} The AM-HM improvement factor $\HM(V)/\AM(V)$ is a quantitative expression of Gödelian complementarity (theos item 37): agents with diverse evidence quality (heterogeneous $V_i$) collectively achieve a tighter variance bound than homogeneous agents, not by being individually better, but by \emph{having different strengths}. The harmonic mean rewards the collective for the diversity of its perspectives.
+
+
+%% ========================================================================
+\section{Discussion}
+\label{sec:discussion}
+%% ========================================================================
+
+\paragraph{What is new.} The contribution is the observation that Keynesian evidence weights from the $\Omega$-framework, when used as adaptive step-size multipliers in multi-agent PG, produce a provable variance improvement of $\HM(V)/\AM(V)$. The proof is a modification of Giannou et al.'s Lyapunov analysis, not a new technique, but the result connects two previously separate literatures: convergence theory for MARL and the epistemology of incomplete knowledge.
+
+\paragraph{What is not new.} The convergence rate exponent $q$ is unchanged. The improvement is in the constant, which matters in practice (it determines how many episodes are needed to reach a given accuracy) but does not change the asymptotic scaling.
+
+\paragraph{Limitations.}
+\begin{enumerate}
+    \item The Keynesian variance model $\sigma_i^2 = C/V_i$ is assumed, not derived from first principles. In practice, the relationship between evidence quality and gradient variance depends on the specific estimator.
+    \item The evidence weights $V_{i,n}$ must be observable or estimable by the agents. In some settings this is natural (e.g.\ sample counts); in others it requires additional machinery.
+    \item The improvement vanishes when all agents have equal evidence. The result is most useful precisely when agents face heterogeneous data environments.
+\end{enumerate}
+
+\paragraph{Future directions.}
+\begin{enumerate}
+    \item Extend to LOLA/opponent-shaping updates (Candidate 2 from the project notes).
+    \item Prove a basin-of-attraction enlargement result under agent diversity (Candidate 3).
+    \item Implement EWPG in the existing simulation framework and compare empirically to standard PG on the matching pennies and iterated prisoner's dilemma environments.
+\end{enumerate}
+
+
+\begin{thebibliography}{99}
+
+\bibitem{giannou2022}
+A.~Giannou, K.~Lotidis, P.~Mertikopoulos, and E.~V.~Vlatakis-Gkaragkounis.
+\newblock On the convergence of policy gradient methods to {N}ash equilibria in general stochastic games.
+\newblock \emph{arXiv:2210.08857}, 2022.
+
+\bibitem{foerster2018}
+J.~Foerster, R.~Y.~Chen, M.~Al-Shedivat, S.~Whiteson, P.~Abbeel, and I.~Mordatch.
+\newblock Learning with opponent-learning awareness.
+\newblock In \emph{AAMAS}, 2018.
+
+\bibitem{keynes1921}
+J.~M.~Keynes.
+\newblock \emph{A Treatise on Probability}.
+\newblock Macmillan, 1921.
+
+\bibitem{knight1921}
+F.~H.~Knight.
+\newblock \emph{Risk, Uncertainty and Profit}.
+\newblock Houghton Mifflin, 1921.
+
+\bibitem{hayek1945}
+F.~A.~Hayek.
+\newblock The use of knowledge in society.
+\newblock \emph{American Economic Review}, 35(4):519--530, 1945.
+
+\end{thebibliography}
+
+\end{document}

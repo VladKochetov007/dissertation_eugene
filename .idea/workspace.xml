@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="651a26be-3260-471c-89ac-79ee920acc64" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/research/base_v1/01_data_inspection.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/research/base_v1/01_data_inspection.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/research/base_v1/02_quantile_regression_lgbm.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/research/base_v1/02_quantile_regression_lgbm.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/research/base_v1/03_simulation_evaluation.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/research/base_v1/03_simulation_evaluation.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/research/base_v1/04_summary_dashboard.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/research/base_v1/04_summary_dashboard.ipynb" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="EmbeddingIndexingInfo">
+    <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/bloomsbury-website" />
+  </component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "customColor": "",
+  "associatedIndex": 8
+}]]></component>
+  <component name="ProjectId" id="38skz2lhZtlWkm8Em7ri852vciY" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "main",
+    "last_opened_file_path": "/Users/meuge"
+  }
+}]]></component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="651a26be-3260-471c-89ac-79ee920acc64" name="Changes" comment="" />
+      <created>1769595925839</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1769595925839</updated>
+    </task>
+    <servers />
+  </component>
+</project>

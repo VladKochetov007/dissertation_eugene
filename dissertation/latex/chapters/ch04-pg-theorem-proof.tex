@@ -1,0 +1,41 @@
+% Chapter 4: Proof of the Policy Gradient Theorem (compact)
+
+\chapter{Proof of the Policy Gradient Theorem}
+\label{ch:pgt-proof}
+
+We now prove Theorem~\ref{thm:pgt}. The argument, due to \cite{sutton2018rl}, uses only the product rule and the Bellman equation, yet yields a remarkable result: the gradient of the performance measure can be written without differentiating the on-policy state distribution.
+
+\begin{proof}[Proof of Theorem~\ref{thm:pgt}]
+We suppress the explicit dependence on~$\bm{\theta}$, writing $\pi(a\mid s)$ for $\pi(a\mid s,\bm{\theta})$. All gradients are with respect to~$\bm{\theta}$.
+
+\medskip\noindent\textbf{Step 1.}\quad
+Differentiating $v_\pi(s) = \sum_a \pi(a\mid s)\,q_\pi(s,a)$ via the product rule:
+\begin{equation}\label{eq:grad-v-step1}
+  \nabla v_\pi(s) = \sum_a \bigl[\nabla\pi(a\mid s)\,q_\pi(s,a) + \pi(a\mid s)\,\nabla q_\pi(s,a)\bigr].
+\end{equation}
+
+\medskip\noindent\textbf{Step 2.}\quad
+Since $\mathcal{P}$ and $\mathcal{R}$ are independent of~$\bm{\theta}$, differentiating the Bellman equation for~$q_\pi$ gives $\nabla q_\pi(s,a) = \gamma\sum_{s'}\mathcal{P}(s'\mid s,a)\,\nabla v_\pi(s')$.
+
+\medskip\noindent\textbf{Step 3.}\quad
+Substituting and defining $\phi(s) = \sum_a \nabla\pi(a\mid s)\,q_\pi(s,a)$ and $P_\pi(s'\mid s) = \sum_a \pi(a\mid s)\,\mathcal{P}(s'\mid s,a)$:
+\begin{equation}\label{eq:grad-v-recursive}
+  \nabla v_\pi(s) = \phi(s) + \gamma\sum_{s'} P_\pi(s'\mid s)\,\nabla v_\pi(s').
+\end{equation}
+
+\medskip\noindent\textbf{Step 4.}\quad
+Unrolling this linear recursion:
+\begin{equation}\label{eq:unrolled}
+  \nabla v_\pi(s) = \sum_{k=0}^{\infty}\gamma^k\sum_{x\in\mathcal{S}} P_\pi^{(k)}(x\mid s)\,\phi(x),
+\end{equation}
+where $P_\pi^{(k)}(x\mid s) = \Pr\{S_{t+k}=x\mid S_t=s,\pi\}$.
+
+\medskip\noindent\textbf{Step 5.}\quad
+Applying to $J(\bm{\theta})=v_\pi(s_0)$ and interchanging the sums:
+\[
+  \nabla J(\bm{\theta}) = \sum_s \eta(s)\sum_a q_\pi(s,a)\,\nabla\pi(a\mid s) \propto \sum_s \mu_\pi(s)\sum_a q_\pi(s,a)\,\nabla_{\bm{\theta}}\,\pi(a\mid s,\bm{\theta}),
+\]
+where $\eta(s)=\sum_{k=0}^\infty \gamma^k P_\pi^{(k)}(s\mid s_0)$ and $\mu_\pi(s)=\eta(s)/\sum_{s'}\eta(s')$.
+\end{proof}
+
+\paragraph{Discussion.} The key insight is that $\nabla_{\bm{\theta}}\mu_\pi$ does not appear: the effect of $\bm{\theta}$ on the state distribution is absorbed into the weighting by~$\eta(s)$ through the recursive unrolling. This depends on $\mathcal{P}$ and $\mathcal{R}$ being independent of~$\bm{\theta}$. In the multi-agent setting of the next chapter, the effective transition dynamics faced by agent~$i$ depend on all agents' policies, breaking this independence and introducing additional gradient terms.

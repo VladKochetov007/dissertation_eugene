@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.env
+*.egg-info/
+node_modules/
+.next/
+build/
+dist/
+*.pdf
+.DS_Store
+pytest-cache-files-*
+dissertation/overleaf/
+dissertation/latex/build/
+dissertation/latex/%OUTDIR%/
+polymarket/pipeline/.env
+polymarket/dashboard/.env.local

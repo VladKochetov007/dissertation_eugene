@@ -1,0 +1,437 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\tcbuselibrary{theorems}
+
+\hypersetup{colorlinks=true, linkcolor=blue!60!black, citecolor=blue!60!black}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+
+\newtcolorbox{keyresult}{colback=blue!5!white, colframe=blue!50!black,
+  fonttitle=\bfseries, title=Key Result}
+
+\DeclareMathOperator{\proj}{proj}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator{\diag}{diag}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\calL}{\mathcal{L}}
+\newcommand{\calX}{\mathcal{X}}
+\newcommand{\calO}{\mathcal{O}}
+\newcommand{\bX}{\mathbf{X}}
+\newcommand{\bx}{\mathbf{x}}
+
+\title{\textbf{Rigorous Gradient Derivation for the $\Omega$-Framework}\\[0.5em]
+\large With First-Order Taylor Decomposition and\\Comparison to Giannou et al.\ (2022)}
+\author{Eugene Shcherbinin}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+
+% ══════════════════════════════════════════════════════════════════
+\section{Setup and Notation}
+% ══════════════════════════════════════════════════════════════════
+
+\subsection{The Data Pipeline}
+
+Fix the following objects from the $\Omega$-framework (Items 1--19):
+
+\begin{center}
+\begin{tabular}{cll}
+\toprule
+\textbf{Symbol} & \textbf{Space} & \textbf{Description} \\
+\midrule
+$\calX$ & $\in O$ & Observed reality (raw experience) \\
+$X = \tau(\calX)$ & $\in \Pi = W \cup S$ & Proposition (rationalised observation) \\
+$\bX = \phi_\psi(X)$ & $\in \R^m$ & Embedding (numerical representation) \\
+$Y = f(\bX)$ & $\in \R^k$ & True causal map (unknown) \\
+$\hat{Y} = \hat{f}_\theta(\bX)$ & $\in \R^k$ & Learned approximation \\
+$\calL(Y, \hat{Y})$ & $\in \R$ & Loss function \\
+\midrule
+$\theta$ & $\in \R^l$ & Model parameters \\
+$\psi$ & $\in \R^p$ & Embedding parameters \\
+$\beta = (\theta, \psi)$ & $\in \R^{l+p}$ & All learnable parameters \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Assumptions}
+
+\begin{enumerate}[label=(A\arabic*)]
+\item $\calL : \R^k \times \R^k \to \R$ is continuously differentiable in both arguments.
+\item $\hat{f}_\theta : \R^m \to \R^k$ is continuously differentiable in $\theta$ and in its input.
+\item $\phi_\psi : \Pi \to \R^m$ is continuously differentiable in $\psi$ (via UPRT, Item 9).
+\item $f : \R^m \to \R^k$ is the true causal map, continuously differentiable (when accessible).
+\end{enumerate}
+
+\subsection{Dimension Summary}
+
+For clarity, we annotate every Jacobian with its dimensions:
+\begin{align*}
+\frac{\partial \calL}{\partial Y} &\in \R^{1 \times k}, &
+\frac{\partial \calL}{\partial \hat{Y}} &\in \R^{1 \times k}, \\
+\frac{\partial f}{\partial \bX} &\in \R^{k \times m}, &
+\frac{\partial \hat{f}_\theta}{\partial \bX} &\in \R^{k \times m}, \\
+\frac{\partial \hat{f}_\theta}{\partial \theta} &\in \R^{k \times l}, &
+\frac{\partial \phi_\psi}{\partial \psi} &\in \R^{m \times p}.
+\end{align*}
+
+\newpage
+% ══════════════════════════════════════════════════════════════════
+\section{The Gradient $\nabla_\beta \log \calL$}
+% ══════════════════════════════════════════════════════════════════
+
+\subsection{Composite Structure}
+
+The loss is:
+\begin{equation}
+\calL = \calL\big(f(\phi_\psi(X)),\; \hat{f}_\theta(\phi_\psi(X))\big).
+\label{eq:loss}
+\end{equation}
+
+Write $\bX_\psi := \phi_\psi(X)$ for the embedding. Then $Y = f(\bX_\psi)$ and $\hat{Y} = \hat{f}_\theta(\bX_\psi)$, so:
+\[
+\calL = \calL(Y(\psi), \hat{Y}(\theta, \psi)).
+\]
+Note: $Y$ depends on $\psi$ (through the embedding) but \emph{not} on $\theta$. $\hat{Y}$ depends on both.
+
+\subsection{Gradient of $\log \calL$}
+
+By the chain rule for $\log$:
+\begin{equation}
+\boxed{\nabla_\beta \log \calL = \frac{1}{\calL} \cdot \nabla_\beta \calL}
+\label{eq:log-grad}
+\end{equation}
+
+So we need $\nabla_\theta \calL$ and $\nabla_\psi \calL$.
+
+\subsection{Gradient w.r.t.\ $\theta$ (the model parameters)}
+
+Since $Y = f(\bX_\psi)$ does not depend on $\theta$:
+\begin{equation}
+\boxed{
+\nabla_\theta \calL = \underbrace{\frac{\partial \calL}{\partial \hat{Y}}}_{1 \times k} \cdot \underbrace{\frac{\partial \hat{f}_\theta(\bX_\psi)}{\partial \theta}}_{k \times l} \;\in\; \R^{1 \times l}
+}
+\label{eq:grad-theta}
+\end{equation}
+
+This is \textbf{standard backpropagation} (Item 19, eq.~1).
+
+Therefore:
+\begin{equation}
+\nabla_\theta \log \calL = \frac{1}{\calL} \cdot \frac{\partial \calL}{\partial \hat{Y}} \cdot \frac{\partial \hat{f}_\theta}{\partial \theta}.
+\label{eq:log-grad-theta}
+\end{equation}
+
+\subsection{Gradient w.r.t.\ $\psi$ (the embedding parameters)}
+
+Both arguments of $\calL$ depend on $\psi$ through $\bX_\psi = \phi_\psi(X)$. By the multivariate chain rule:
+
+\begin{equation}
+\boxed{
+\nabla_\psi \calL = \bigg[\underbrace{\frac{\partial \calL}{\partial Y} \cdot \frac{\partial f}{\partial \bX}}_{\text{through } f \text{ (causal)}} + \underbrace{\frac{\partial \calL}{\partial \hat{Y}} \cdot \frac{\partial \hat{f}_\theta}{\partial \bX}}_{\text{through } \hat{f}_\theta \text{ (learned)}}\bigg] \cdot \frac{\partial \phi_\psi}{\partial \psi} \;\in\; \R^{1 \times p}
+}
+\label{eq:grad-psi}
+\end{equation}
+
+\textbf{The two-term structure} (Item 19, eq.~2):
+\begin{itemize}[nosep]
+\item \textbf{Term A} (causal): $\frac{\partial \calL}{\partial Y} \cdot \frac{\partial f}{\partial \bX} \cdot \frac{\partial \phi_\psi}{\partial \psi}$ — propagates through the \emph{true} causal map $f$. \textbf{Inaccessible} if $f$ is unknown.
+\item \textbf{Term B} (learned): $\frac{\partial \calL}{\partial \hat{Y}} \cdot \frac{\partial \hat{f}_\theta}{\partial \bX} \cdot \frac{\partial \phi_\psi}{\partial \psi}$ — propagates through the \emph{learned} approximation $\hat{f}_\theta$. Always computable.
+\end{itemize}
+
+Therefore:
+\begin{equation}
+\nabla_\psi \log \calL = \frac{1}{\calL}\bigg[\frac{\partial \calL}{\partial Y} \cdot \frac{\partial f}{\partial \bX} + \frac{\partial \calL}{\partial \hat{Y}} \cdot \frac{\partial \hat{f}_\theta}{\partial \bX}\bigg] \cdot \frac{\partial \phi_\psi}{\partial \psi}.
+\label{eq:log-grad-psi}
+\end{equation}
+
+\subsection{The Full Gradient $\nabla_\beta \log \calL$}
+
+Combining \eqref{eq:log-grad-theta} and \eqref{eq:log-grad-psi}:
+
+\begin{keyresult}
+Let $\beta = (\theta, \psi) \in \R^{l+p}$. Then:
+\begin{equation}
+\nabla_\beta \log \calL = \frac{1}{\calL}
+\begin{pmatrix}
+\dfrac{\partial \calL}{\partial \hat{Y}} \cdot \dfrac{\partial \hat{f}_\theta}{\partial \theta} \\[1.5em]
+\bigg[\dfrac{\partial \calL}{\partial Y} \cdot \dfrac{\partial f}{\partial \bX} + \dfrac{\partial \calL}{\partial \hat{Y}} \cdot \dfrac{\partial \hat{f}_\theta}{\partial \bX}\bigg] \cdot \dfrac{\partial \phi_\psi}{\partial \psi}
+\end{pmatrix}
+\label{eq:full-gradient}
+\end{equation}
+The $\theta$-block has dimension $l$. The $\psi$-block has dimension $p$. The $\psi$-block contains the inaccessible term $\partial f / \partial \bX$.
+\end{keyresult}
+
+
+\newpage
+% ══════════════════════════════════════════════════════════════════
+\section{First-Order Taylor Expansion and the Trinity Decomposition}
+\label{sec:taylor}
+% ══════════════════════════════════════════════════════════════════
+
+\subsection{Taylor Expansion of the Loss}
+
+Let $Y^* \in \R^k$ be a reference prediction (e.g., the Bayes-optimal predictor at a stationary $\theta^*$). Define the residual $\delta = \hat{Y} - Y^*$. Taylor-expanding $\calL$ in its second argument:
+
+\begin{equation}
+\calL(Y, Y^* + \delta) = \calL(Y, Y^*) + \nabla_{\hat{Y}} \calL(Y, Y^*)^\top \delta + \frac{1}{2}\delta^\top \nabla^2_{\hat{Y}} \calL(Y, Y^*) \, \delta + \calO(\|\delta\|^3).
+\label{eq:taylor-loss}
+\end{equation}
+
+\subsection{The Expected Risk and Trinity Decomposition}
+
+The expected risk (Item 20):
+\begin{equation}
+R(\theta, \psi) = \E_{\calX \sim p}\big[\calL\big(f(\phi_\psi(\tau(\calX))),\; \hat{f}_\theta(\phi_\psi(\tau(\calX)))\big)\big].
+\label{eq:risk}
+\end{equation}
+
+By the Trinity partition (Item 21), since $\tau : O \to \Pi$ is a bijection and $\Pi = W \cup S$:
+
+\begin{equation}
+\boxed{
+R(\theta, \psi) = P_W \cdot \E[\calL \mid X \in W] + P_S \cdot \E[\calL \mid X \in S]
+}
+\label{eq:trinity-risk}
+\end{equation}
+
+where $P_W = P_\theta(\tau^{-1}(W))$ and $P_S = P_\theta(\tau^{-1}(S))$.
+
+\subsection{Taylor + Trinity = Loss Decomposition}
+
+Substituting \eqref{eq:taylor-loss} into \eqref{eq:trinity-risk} and writing $H_{\hat{Y}} = \nabla^2_{\hat{Y}}\calL(Y, Y^*)$:
+
+\begin{keyresult}
+\begin{align}
+R(\theta, \psi) &\approx \underbrace{P_W \cdot \E[\calL(Y, Y^*) \mid W] + P_S \cdot \E[\calL(Y, Y^*) \mid S]}_{\text{irreducible loss at reference}} \nonumber \\[0.5em]
+&\quad + \underbrace{P_W \cdot \E[\nabla_{\hat{Y}}\calL^\top \delta \mid W] + P_S \cdot \E[\nabla_{\hat{Y}}\calL^\top \delta \mid S]}_{\text{first-order correction (bias)}} \label{eq:trinity-taylor} \\[0.5em]
+&\quad + \underbrace{\tfrac{1}{2}P_W \cdot \E[\delta^\top H_{\hat{Y}} \delta \mid W] + \tfrac{1}{2}P_S \cdot \E[\delta^\top H_{\hat{Y}} \delta \mid S]}_{\text{second-order correction (variance / curvature)}} \nonumber
+\end{align}
+\end{keyresult}
+
+\textbf{Interpretation} (this is the key entry point):
+\begin{enumerate}[nosep]
+\item \textbf{Row 1}: Irreducible error — the loss you'd get even with the best possible predictor. Includes Pirsig's ``Quality loss'' (information destroyed by $\tau$).
+\item \textbf{Row 2}: Bias — directional misalignment of $\hat{Y}$ from $Y^*$. Vanishes at a stationary point. Decomposes separately over $W$ and $S$: the learner may be biased differently on truths vs.\ falsehoods.
+\item \textbf{Row 3}: Variance/curvature — the cost of dispersion around $Y^*$. The Hessian $H_{\hat{Y}}$ controls how sensitive the loss is to prediction errors. Also decomposes over $W$ and $S$.
+\end{enumerate}
+
+\subsection{Gradient of the Trinity-Expanded Risk}
+
+Differentiating \eqref{eq:trinity-risk} w.r.t.\ $\theta$, and noting that $P_W, P_S$ may depend on $\theta$ if the sampling distribution $p_\theta$ does:
+
+\begin{equation}
+\nabla_\theta R = P_W \, \E[\calL \cdot s_\theta + \nabla_\theta \calL \mid W] + P_S \, \E[\calL \cdot s_\theta + \nabla_\theta \calL \mid S]
+\label{eq:trinity-grad}
+\end{equation}
+
+where $s_\theta(\calX) := \nabla_\theta \log p_\theta(\calX)$ is the \textbf{score function}.
+
+Each conditional expectation contains both the REINFORCE term ($\calL \cdot s_\theta$, exploration) and the backprop term ($\nabla_\theta \calL$, exploitation). The Trinity splits each into a $W$-component and an $S$-component.
+
+
+\newpage
+% ══════════════════════════════════════════════════════════════════
+\section{Parameter-Space Taylor Expansion}
+% ══════════════════════════════════════════════════════════════════
+
+Alternatively, expand $R$ in $\theta$ around a stationary point $\theta^*$ where $\nabla_\theta R(\theta^*) = 0$. Let $\delta_\theta = \theta - \theta^*$:
+
+\begin{equation}
+R(\theta^* + \delta_\theta) \approx R(\theta^*) + \frac{1}{2}\delta_\theta^\top \Big(\underbrace{H_W^\theta}_{W\text{-curvature}} + \underbrace{H_S^\theta}_{S\text{-curvature}}\Big) \delta_\theta
+\label{eq:param-taylor}
+\end{equation}
+
+where $H_A^\theta = \nabla^2_\theta R_A(\theta^*)$ for $A \in \{W, S\}$. The eigenspectra of $H_W^\theta$ and $H_S^\theta$ reveal whether the learner's parameter sensitivity comes from getting truths wrong or from getting falsehoods wrong.
+
+
+\newpage
+% ══════════════════════════════════════════════════════════════════
+\section{Comparison with Giannou et al.\ (2022)}
+\label{sec:giannou}
+% ══════════════════════════════════════════════════════════════════
+
+Giannou et al.\ study the convergence of policy gradient methods to Nash equilibria in general stochastic games. Their framework:
+
+\begin{itemize}[nosep]
+\item $N$-player stochastic game $\mathcal{G} = (\mathcal{S}, \mathcal{N}, \{\mathcal{A}_i\}, \{R_i\}, P, \zeta, \rho)$
+\item Policy gradient update: $\pi_{n+1} = \proj_\Pi(\pi_n + \gamma_n \hat{v}_n)$
+\item Gradient dominance property (GDP): $V_{i,\rho}(\pi'_i; \pi_{-i}) - V_{i,\rho}(\pi_i; \pi_{-i}) \leq C_\mathcal{G} \max_{\tilde\pi_i} \langle \nabla_i V_i, \tilde\pi_i - \pi_i \rangle$
+\item SOS condition: $(\pi - \pi^*)^\top \text{Jac}_v(\pi^*)(\pi - \pi^*) < 0$
+\end{itemize}
+
+\subsection{Where the $\Omega$-Framework is Superior}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{p{3.5cm}p{5cm}p{5cm}}
+\toprule
+\textbf{Dimension} & \textbf{Giannou et al.} & \textbf{$\Omega$-Framework} \\
+\midrule
+\textbf{Gradient structure} & Single gradient $v(\pi) = \nabla_i V_i$. & Five-component gradient (eq.\ 27 of theos): exploration + exploitation + evidence-seeking + alignment + opponent-shaping. \\
+
+\textbf{Representation} & Fixed tabular parameterization $\pi_i : \mathcal{S} \to \Delta(\mathcal{A}_i)$. & Learnable embedding $\phi_\psi$ with its own gradient (eq.~\ref{eq:grad-psi}). Creates a bilevel optimization that Giannou doesn't address. \\
+
+\textbf{Loss decomposition} & Single value function $V_{i,\rho}(\pi)$. & Trinity decomposition: $R = P_W \E[\calL \mid W] + P_S \E[\calL \mid S]$. Convergence can be tracked \emph{separately} on truths vs.\ falsehoods. \\
+
+\textbf{GDP refinement} & Single GDP inequality (their Lemma 2). & Trinity-refined GDP with separate $W$ and $S$ bounds. Rates may differ: the learner converges faster on truths than falsehoods (or vice versa). \\
+
+\textbf{Irreducible error} & Not modeled — assumes the game is fully specified. & Explicit irreducible loss from the $O$-set (Pirsig's Quality, G\"odel's incompleteness). The gap $Y - \hat{Y}$ has a floor that no gradient can eliminate. \\
+
+\textbf{Multi-agent structure} & Agents are symmetric (same ``type'' of gradient). & G\"odelian complementarity: agents with different $F_i$ have structurally different blind spots $B_i$. Multi-agent $>$ single-agent not by speed but by \emph{coverage}. \\
+
+\textbf{Evidence quality} & Not modeled. & Keynesian weight of evidence $V_i(\calX)$ as second loss axis. Evidence-seeking gradient term (eq.\ 11 of theos): $-\mu V^{-2} \nabla_\theta V$. \\
+
+\textbf{Convergence type} & Local convergence to Nash with probability $1 - \delta$ (their Thm 1). & Same guarantee applies to the exploitation term. But the exploration term (REINFORCE) enables \emph{global} search over $O$. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Formal Refinement: Trinity GDP}
+
+\begin{proposition}[Trinity-Refined Gradient Dominance]
+\label{prop:trinity-gdp}
+Under the $\Omega$-framework, for any policy profile $\pi = (\pi_i)_{i \in \mathcal{N}}$ and unilateral deviation $\pi'_i$:
+\begin{equation}
+V_{i,\rho}(\pi'_i; \pi_{-i}) - V_{i,\rho}(\pi_i; \pi_{-i}) \leq C_\mathcal{G}\Big[P_W \max_{\tilde\pi_i}\langle \nabla_i V_i^W(\pi), \tilde\pi_i - \pi_i\rangle + P_S \max_{\tilde\pi_i}\langle \nabla_i V_i^S(\pi), \tilde\pi_i - \pi_i\rangle\Big]
+\label{eq:trinity-gdp}
+\end{equation}
+where $V_i^W, V_i^S$ are the value functions restricted to states reachable through $W$- and $S$-propositions respectively.
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+Apply Giannou's Lemma 2 separately to the $W$ and $S$ components of the reward, using the Trinity decomposition of the expected trajectory reward:
+\[
+V_{i,s}(\pi) = \E\bigg[\sum_{t=0}^{T(\tau)} R_i(s_t, \alpha_t) \bigg| s_0 = s\bigg] = \underbrace{\E\big[R_i \cdot \mathbf{1}_{X_t \in W}\big]}_{V_i^W} + \underbrace{\E\big[R_i \cdot \mathbf{1}_{X_t \in S}\big]}_{V_i^S}.
+\]
+The GDP (which follows from the linearity of $V$ in $\pi_i$) applies to each component since $V_i^W + V_i^S = V_i$.
+\end{proof}
+
+\begin{corollary}[Asymmetric Convergence Rates]
+If $\pi^*$ is SOS and the Trinity-refined GDP holds, then the convergence rate from Giannou's Theorem 2 applies separately to $V_i^W$ and $V_i^S$, potentially with different constants $\mu_W, \mu_S$ in the SOS condition. In particular, a learner may:
+\begin{itemize}[nosep]
+\item Converge at rate $\calO(1/n)$ on $W$-propositions (truths it gets right),
+\item Converge at rate $\calO(1/\sqrt{n})$ on $S$-propositions (falsehoods it gets wrong),
+\end{itemize}
+and the overall rate is dominated by the slower component.
+\end{corollary}
+
+
+\subsection{The Five-Component Gradient vs.\ Giannou's PG Template}
+
+Giannou's PG template (their eq.\ PG):
+\[
+\pi_{n+1} = \proj_\Pi(\pi_n + \gamma_n \hat{v}_n)
+\]
+with $\hat{v}_n = v(\pi_n) + U_n + b_n$ (true gradient + noise + bias).
+
+In the $\Omega$-framework (Item 52), $\hat{v}_n$ decomposes as:
+\begin{equation}
+\hat{v}_{i,n} = \underbrace{\omega_i \E[\calL \cdot s_{\theta_i}]}_{\text{(a) exploration}} + \underbrace{\omega_i \E[\nabla_{\theta_i} \calL]}_{\text{(b) exploitation}} + \underbrace{\omega_i \mu(-V_i^{-2}\nabla_{\theta_i} V_i)}_{\text{(c) evidence}} + \underbrace{\lambda \nabla_{\theta_i} D}_{\text{(d) alignment}} + \underbrace{\sum_{j \neq i} \frac{\partial R_i}{\partial \theta_j}\frac{\partial \theta'_j}{\partial \theta_i}}_{\text{(e) opponent shaping}}
+\label{eq:five-component}
+\end{equation}
+
+\textbf{What Giannou captures}: Only term (b), the exploitation gradient. Their $v(\pi_n)$ is the exact policy gradient, which is the exploitation term.
+
+\textbf{What Giannou misses}:
+\begin{itemize}[nosep]
+\item \textbf{(a) Exploration}: The REINFORCE score-function term that adjusts \emph{where} the agent looks. This is not a noise term ($U_n$) — it's a systematic gradient component.
+\item \textbf{(c) Evidence}: The Keynesian evidence-seeking term. Absent from any standard MARL framework.
+\item \textbf{(d) Alignment}: The consensus penalty. Related to communication in Dec-POMDPs but not in Giannou's model.
+\item \textbf{(e) Opponent shaping}: The LOLA term. Giannou explicitly assumes agents treat others as stationary (their Model 1). The $\Omega$-framework models opponent adaptation.
+\end{itemize}
+
+\begin{remark}
+Giannou's convergence results (Theorems 1--3) apply to the exploitation term (b) in isolation. The $\Omega$-framework's contribution is showing that in practice, agents should optimize \emph{all five terms simultaneously}, and the convergence guarantees from Giannou give a lower bound on what the exploitation term alone achieves.
+\end{remark}
+
+
+\newpage
+% ══════════════════════════════════════════════════════════════════
+\section{The SOS Condition and Trinity Curvature}
+% ══════════════════════════════════════════════════════════════════
+
+Giannou's SOS condition (their eq.\ SOS):
+\[
+(\pi - \pi^*)^\top \text{Jac}_v(\pi^*)(\pi - \pi^*) < 0 \quad \text{for all } \pi \in \Pi \setminus \{\pi^*\}.
+\]
+
+In the $\Omega$-framework, the Jacobian $\text{Jac}_v$ decomposes via the Trinity:
+
+\begin{equation}
+\text{Jac}_v(\pi^*) = P_W \cdot \text{Jac}_{v^W}(\pi^*) + P_S \cdot \text{Jac}_{v^S}(\pi^*).
+\label{eq:trinity-jac}
+\end{equation}
+
+This means the SOS condition can be \emph{refined}:
+
+\begin{definition}[Trinity-SOS]
+A Nash policy $\pi^*$ is \textbf{Trinity-SOS} if:
+\begin{align}
+(\pi - \pi^*)^\top \text{Jac}_{v^W}(\pi^*)(\pi - \pi^*) &< 0 \quad \text{(SOS on truths)} \label{eq:sos-W} \\
+(\pi - \pi^*)^\top \text{Jac}_{v^S}(\pi^*)(\pi - \pi^*) &< 0 \quad \text{(SOS on falsehoods)} \label{eq:sos-S}
+\end{align}
+for all $\pi \neq \pi^*$ sufficiently close.
+\end{definition}
+
+\begin{remark}
+Trinity-SOS is \emph{stronger} than Giannou's SOS (it implies SOS by linearity) but gives \emph{finer} convergence information. The eigenvalues of $\text{Jac}_{v^W}$ and $\text{Jac}_{v^S}$ independently control convergence on truths vs.\ falsehoods. A policy might be SOS overall but unstable on $S$ (the falsehood component has a positive eigenvalue), meaning the learner is systematically worsening on falsehoods while improving on truths — a phenomenon Giannou's framework cannot detect.
+\end{remark}
+
+
+\newpage
+% ══════════════════════════════════════════════════════════════════
+\section{Summary: What the $\Omega$-Framework Adds}
+% ══════════════════════════════════════════════════════════════════
+
+\begin{enumerate}
+\item \textbf{The gradient is richer}: Five components vs.\ one. Giannou's convergence results give a floor for what exploitation alone achieves; the $\Omega$-framework shows the full gradient agents should compute.
+
+\item \textbf{The loss decomposes}: The Trinity $W/S$ split gives separate convergence tracking on truths vs.\ falsehoods. This is invisible in Giannou's framework.
+
+\item \textbf{There's an irreducible floor}: The $O$-set (G\"odel, Pirsig, Keynes) means $R(\theta^*) > 0$ for any $\theta^*$. Giannou's framework implicitly assumes the game is fully specified; the $\Omega$-framework models what is \emph{structurally unknowable}.
+
+\item \textbf{Representation learning matters}: The $\psi$-gradient (eq.~\ref{eq:grad-psi}) with its inaccessible term $\partial f / \partial \bX$ is absent from Giannou's tabular setting. This is where Pearl's causal structure (Item 46--48) provides the missing $\partial f / \partial \bX$ via DAG-structured backpropagation.
+
+\item \textbf{Multi-agent is structurally different}: G\"odelian complementarity means multi-agent systems can know strictly more than any single agent — not by being faster (Giannou's concern) but by having non-overlapping blind spots. The five-component gradient (eq.~\ref{eq:five-component}) captures this via the opponent-shaping term.
+
+\item \textbf{The Taylor expansion is the entry method}: Equation \eqref{eq:trinity-taylor} is the key decomposition. At any stationary point, the risk separates into irreducible loss (row 1), bias (row 2), and variance (row 3), each further split over $W$ and $S$. This is the diagnostic tool: which component of the loss, on which partition of reality, is the learner failing?
+\end{enumerate}
+
+
+\newpage
+% ══════════════════════════════════════════════════════════════════
+\section*{Appendix: Lean 4 Formalization Summary}
+% ══════════════════════════════════════════════════════════════════
+
+A Lean 4 file \texttt{Theos.lean} accompanies this document, formalizing:
+\begin{itemize}[nosep]
+\item The truth value type \texttt{TruthVal} and partition $W, O, S$ (Items 2--4)
+\item The Trinity exhaustiveness and disjointness theorems (proved)
+\item $O = \Pi^c$ (proved)
+\item The bijection $\tau : O \to \Pi$ (axiomatized)
+\item The UPRT: $\Pi \leftrightarrow \R^\infty$ (axiomatized)
+\item The learning pipeline: $\texttt{LossFunction}$, $\texttt{Embedding}$, $\texttt{CausalMap}$, $\texttt{Approximator}$, $\texttt{LearningPipeline}$ (defined as structures)
+\item The gradient decompositions (axiomatized as structural claims)
+\item Connection to Giannou: the $\Omega$-gradient subsumes Giannou's PG template (stated)
+\end{itemize}
+
+The file requires Lean 4 with Mathlib. Proofs marked \texttt{sorry} require analysis-level Mathlib (continuous differentiability, Fr\'echet derivatives) which is available but verbose to formalize fully.
+
+\end{document}
