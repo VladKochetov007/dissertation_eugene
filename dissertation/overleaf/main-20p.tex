@@ -86,13 +86,42 @@ Chapter~\ref{ch:framework} develops the learning framework. Chapter~\ref{ch:resu
 
 We validate the four main results on $N$-player matrix games. Full experimental details, additional games, and application experiments are in Appendices~\ref{app:sims}--\ref{app:applications}. Here we present the key confirmations.
 
-\paragraph{EW-PG variance improvement.} On 2-player Matching Pennies with heterogeneous noise $V = [V_1, V_2]$, we measure the empirical variance ratio $\sigma_w^2/\sigma_{\text{std}}^2$ against the theoretical $\operatorname{HM}(V)/\operatorname{AM}(V)$ for evidence ratios $r = V_1/V_2 \in [1, 20]$. The empirical curve tracks the theoretical prediction closely (Appendix~\ref{app:sims}, Fig.~1).
+\paragraph{EW-PG variance improvement.} On 2-player Matching Pennies with heterogeneous noise $V = [V_1, V_2]$, we measure the empirical variance ratio $\sigma_w^2/\sigma_{\text{std}}^2$ against the theoretical $\operatorname{HM}(V)/\operatorname{AM}(V)$ for evidence ratios $r = V_1/V_2 \in [1, 20]$. The empirical curve tracks the theoretical prediction closely (Figure~\ref{fig:main-ewpg}).
 
-\paragraph{LOLA basin enlargement.} We sweep initial conditions on the 2-simplex for Matching Pennies and Battle of the Sexes, classifying convergence/divergence. LOLA-PG doubles the basin of attraction in Matching Pennies (a zero-sum game where spectral reinforcement holds). No enlargement in Battle of the Sexes (a coordination game), confirming the spectral condition is necessary.
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{figures/full/exp1_ewpg_variance.png}
+\caption{EW-PG variance reduction across three heterogeneity levels and two games. Greater heterogeneity $\to$ greater EW-PG advantage, matching the HM/AM prediction.}
+\label{fig:main-ewpg}
+\end{figure}
 
-\paragraph{Self-knowledge bottleneck.} In a 4-player team game (2v2), we compare Standard PG, Coop-PG, and EW-Coop-PG under three conditions: all articulate (noise 0.1), mixed (team 1 articulate, team 2 ``vibing''), and all vibing (noise 2.0). Coop-PG improves payoff in all conditions, but the improvement degrades for vibing agents, confirming Corollary~\ref{cor:bottleneck-ch3}.
+\paragraph{LOLA basin enlargement.} We sweep initial conditions on the 2-simplex for Matching Pennies and Battle of the Sexes, classifying convergence/divergence. LOLA-PG doubles the basin of attraction in Matching Pennies (a zero-sum game where spectral reinforcement holds). No enlargement in Battle of the Sexes (a coordination game), confirming the spectral condition is necessary (Figure~\ref{fig:main-basin}).
 
-\paragraph{Sparsity curriculum.} On a 50-action game with 2 optimal actions, Sparse-EW-PG reduces the fraction of active actions from 1.0 to 0.085 (91.5\% sparsification), while Standard PG remains at 0.97. The L1 regularisation discovers the sparse support within 500 episodes.
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.48\textwidth]{figures/lola/basin_matching_pennies.png}
+\includegraphics[width=0.48\textwidth]{figures/lola/basin_battle_of_the_sexes.png}
+\caption{Basin of attraction: Standard PG vs LOLA-PG. Left: Matching Pennies (zero-sum, spectral reinforcement holds --- LOLA doubles the basin). Right: Battle of the Sexes (coordination, no spectral reinforcement --- no enlargement).}
+\label{fig:main-basin}
+\end{figure}
+
+\paragraph{Self-knowledge bottleneck.} In a 4-player team game (2v2), we compare Standard PG, Coop-PG, and EW-Coop-PG under three conditions: all articulate (noise 0.1), mixed (team 1 articulate, team 2 ``vibing''), and all vibing (noise 2.0). Coop-PG improves payoff in all conditions, but the improvement degrades for vibing agents, confirming Corollary~\ref{cor:bottleneck-ch3} (Figure~\ref{fig:main-coalition}).
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{figures/full/exp3_coalition.png}
+\caption{Coalition formation in a 4-player team game. Communication benefit degrades as agents become more ``vibing'' (right panel), confirming the self-knowledge bottleneck.}
+\label{fig:main-coalition}
+\end{figure}
+
+\paragraph{Sparsity curriculum.} On a 50-action game with 2 optimal actions, Sparse-EW-PG reduces the fraction of active actions from 1.0 to 0.085 (91.5\% sparsification), while Standard PG remains at 0.97. The L1 regularisation discovers the sparse support within 500 episodes (Figure~\ref{fig:main-sparsity}).
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{figures/full/exp5_sparsity.png}
+\caption{Sparsity curriculum ($d=50$, $k=2$). Left: effective dimension. Centre: policy sparsity. Right: distance to Nash. Sparse-EW-PG achieves 91.5\% sparsification.}
+\label{fig:main-sparsity}
+\end{figure}
 
 
 % ======================================================================
@@ -124,8 +153,6 @@ We extended the convergence framework of Giannou et al.~\cite{giannou2022} with 
 
 \input{chapters/ch06-meta-mapg-theorem}
 
-\chapter{Full Experimental Suite}
-\label{app:sims}
 \input{chapters/ch04-simulations}
 
 \input{chapters/ch10-cooperative-communication}
