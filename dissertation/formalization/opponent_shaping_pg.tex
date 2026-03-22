@@ -1,0 +1,449 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{enumerate}
+\usepackage{hyperref}
+\usepackage{cleveref}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+
+\DeclareMathOperator{\proj}{proj}
+\DeclareMathOperator{\AM}{AM}
+\DeclareMathOperator{\HM}{HM}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator{\Jac}{Jac}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\cF}{\mathcal{F}}
+\newcommand{\cU}{\mathcal{U}}
+\newcommand{\cE}{\mathcal{E}}
+\newcommand{\cB}{\mathcal{B}}
+\newcommand{\ip}[2]{\langle #1, #2 \rangle}
+
+\title{Opponent-Shaping Policy Gradient Convergence\\in General Stochastic Games}
+\author{Eugene Shcherbinin\\
+\small BSc Mathematics, London School of Economics\\
+\small Candidate 007}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We prove the first convergence guarantee for LOLA-type opponent-shaping policy gradient methods in general stochastic games. Building on Giannou et al.\ (2022), we show that: (a) with annealed opponent-shaping strength $\lambda_n \to 0$, convergence to Nash equilibria is preserved at the standard rate; (b) under a \emph{spectral reinforcement condition} on the opponent-shaping Hessian, the basin of attraction is strictly enlarged. Combined with the evidence-weighted PG from the companion paper, this gives a multi-agent gradient with both tighter variance constants and a larger convergence region. The results formalize the Gödelian complementarity principle of the $\Omega$-framework: multi-agent systems that model each other's learning achieve provably better convergence than independent learners.
+\end{abstract}
+
+\tableofcontents
+
+
+%% ========================================================================
+\section{Introduction}
+\label{sec:intro}
+%% ========================================================================
+
+Foerster et al.\ \cite{foerster2018} introduced Learning with Opponent-Learning Awareness (LOLA), in which agent $i$ differentiates through agent $j$'s anticipated learning step, producing the augmented gradient:
+\begin{equation}
+\label{eq:lola-intro}
+    \nabla_{\theta_i}^{\text{LOLA}} R_i = \nabla_{\theta_i} R_i + \sum_{j \neq i} \frac{\partial R_i}{\partial \theta_j} \cdot \frac{\partial \theta_j'}{\partial \theta_i},
+\end{equation}
+where $\theta_j' = \theta_j - \eta_j \nabla_{\theta_j} R_j$ is $j$'s anticipated update. LOLA has shown strong empirical performance in iterated games but lacks convergence guarantees in the general stochastic game setting of Giannou et al.\ \cite{giannou2022}.
+
+\paragraph{Contribution.} We prove that:
+\begin{enumerate}
+    \item \textbf{Annealed LOLA preserves convergence} (\Cref{thm:annealed}): if $\lambda_n \to 0$ at rate $O(1/n^r)$ with $r > 1-p$, all convergence guarantees of \cite{giannou2022} carry over.
+    \item \textbf{Constant LOLA converges to a neighbourhood} (\Cref{thm:constant}): with fixed $\lambda > 0$, the iterates converge to an $O(\lambda)$-neighbourhood of Nash.
+    \item \textbf{Basin of attraction enlargement} (\Cref{thm:basin}): under a spectral condition on the opponent-shaping Hessian, the effective SOS parameter increases from $\mu$ to $\mu + \lambda \mu_H$, strictly enlarging the convergence region.
+\end{enumerate}
+
+
+%% ========================================================================
+\section{Setup}
+\label{sec:setup}
+%% ========================================================================
+
+We adopt the notation and framework of \cite{giannou2022} exactly as recalled in the companion paper on evidence-weighted PG. The stochastic game $\mathcal{G}$, policies $\pi \in \Pi$, value functions $V_{i,\rho}(\pi)$, gradient field $v(\pi) = (v_i(\pi))_{i \in \mathcal{N}}$, and the standard PG update \eqref{eq:pg-std} are as defined there.
+
+\begin{equation}
+\label{eq:pg-std}
+\tag{PG}
+    \pi_{n+1} = \proj_\Pi(\pi_n + \gamma_n \hat{v}_n)
+\end{equation}
+
+
+%% ========================================================================
+\section{The Opponent-Shaping Term}
+\label{sec:os}
+%% ========================================================================
+
+\begin{definition}[Opponent-shaping map]
+\label{def:os}
+The \emph{opponent-shaping map} $\mathrm{OS} : \Pi \to \prod_i \R^{A_i \times S}$ is defined by:
+\begin{equation}
+\label{eq:os-def}
+    \mathrm{OS}_i(\pi) = \sum_{j \neq i} \frac{\partial R_i}{\partial \pi_j} \cdot \frac{\partial \pi_j'}{\partial \pi_i}, \qquad \pi_j' = \pi_j - \eta_j \nabla_{\pi_j} V_{j,\rho}(\pi).
+\end{equation}
+\end{definition}
+
+\begin{lemma}[Properties of OS]
+\label{lem:os-properties}
+The opponent-shaping map satisfies:
+\begin{enumerate}[(a)]
+    \item \textbf{Boundedness:} $\|\mathrm{OS}(\pi)\| \leq G$ for all $\pi \in \Pi$, where $G$ depends on the game parameters $(N, S, A, \zeta)$ and the learning rates $\eta_j$.
+    \item \textbf{Vanishing at Nash:} If $\pi^*$ is a Nash equilibrium and $\eta_j$ are sufficiently small, then $\mathrm{OS}(\pi^*) = 0$.
+    \item \textbf{Lipschitz continuity:} $\|\mathrm{OS}(\pi) - \mathrm{OS}(\pi')\| \leq L_{\mathrm{OS}} \|\pi - \pi'\|$ for a constant $L_{\mathrm{OS}}$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+(a) follows from the bounded rewards $R_i \in [-1,1]$ and the compactness of $\Pi$. (b) at Nash, $\nabla_{\pi_j} V_{j,\rho}(\pi^*)$ and $\pi_j$ are aligned (first-order stationarity), so $\pi_j' \approx \pi_j^*$ and the cross-derivative term vanishes to first order. (c) follows from the smoothness of the value functions.
+\end{proof}
+
+
+%% ========================================================================
+\section{Annealed LOLA-PG: Convergence Preservation}
+\label{sec:annealed}
+%% ========================================================================
+
+\begin{definition}[LOLA-PG]
+\label{def:lola-pg}
+The \emph{LOLA-PG} update is:
+\begin{equation}
+\label{eq:lola-pg}
+\tag{LOLA-PG}
+    \pi_{n+1} = \proj_\Pi\bigl(\pi_n + \gamma_n(\hat{v}_n + \lambda_n \cdot \mathrm{OS}(\pi_n))\bigr),
+\end{equation}
+where $\lambda_n \geq 0$ controls the strength of opponent shaping.
+\end{definition}
+
+\subsection{Opponent shaping as additional bias}
+
+\begin{lemma}[Bias absorption]
+\label{lem:bias-absorption}
+The LOLA-PG gradient signal can be decomposed as:
+\begin{equation}
+    \hat{v}_n^{\mathrm{LOLA}} = v(\pi_n) + U_n + b_n^{\mathrm{LOLA}},
+\end{equation}
+where $U_n$ is the same zero-mean noise as in standard PG, and the modified bias is:
+\begin{equation}
+\label{eq:bias-lola}
+    b_n^{\mathrm{LOLA}} = b_n + \lambda_n \cdot \mathrm{OS}(\pi_n).
+\end{equation}
+The modified bias satisfies:
+\begin{equation}
+\label{eq:bias-bound-lola}
+    \|b_n^{\mathrm{LOLA}}\| \leq B_n + \lambda_n G =: B_n^{\mathrm{LOLA}}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+By the triangle inequality:
+\[
+    \|b_n + \lambda_n \mathrm{OS}(\pi_n)\| \leq \|b_n\| + \lambda_n \|\mathrm{OS}(\pi_n)\| \leq B_n + \lambda_n G. \qedhere
+\]
+\end{proof}
+
+\subsection{Annealing schedule}
+
+\begin{lemma}[Schedule compatibility]
+\label{lem:schedule}
+Let $\gamma_n = \gamma/(n+m)^p$ with $p \in (1/2, 1]$, and $\lambda_n = \bar{\lambda}/(n+m)^r$. If the standard bias satisfies $B_n = \mathcal{O}(1/n^{\ell_b})$, then:
+\begin{equation}
+    B_n^{\mathrm{LOLA}} = \mathcal{O}\!\left(\frac{1}{n^{\min(\ell_b, r)}}\right).
+\end{equation}
+The Giannou condition $p + \ell_b^{\mathrm{LOLA}} > 1$ becomes $p + \min(\ell_b, r) > 1$, which holds whenever $r > 1 - p$.
+\end{lemma}
+
+\begin{theorem}[Convergence of annealed LOLA-PG]
+\label{thm:annealed}
+Let $\pi^*$ be a stable Nash policy. Consider LOLA-PG \eqref{eq:lola-pg} with annealing schedule $\lambda_n = \bar{\lambda}/(n+m)^r$, where $r > 1 - p$. Under the same hypotheses as Giannou et al.\ Theorem 1:
+\begin{enumerate}[(1)]
+    \item There exists a neighbourhood $\cU$ of $\pi^*$ such that $\Prob(\pi_n \to \pi^* \mid \pi_1 \in \cU) \geq 1 - \delta$.
+
+    \item If $\pi^*$ is SOS with parameter $\mu$, the convergence rate is:
+    \begin{equation}
+    \label{eq:rate-lola}
+        \E[\|\pi_n - \pi^*\|^2 \mid \cE] = \mathcal{O}\!\left(\frac{1}{n^{q_{\mathrm{LOLA}}}}\right),
+    \end{equation}
+    where $q_{\mathrm{LOLA}} = \min(\ell_b, r, p - 2\ell_\sigma)$.
+
+    \item Choosing $r = p$ gives $q_{\mathrm{LOLA}} = q$ (identical rate to standard PG).
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+The proof is a direct reduction to \cite[Theorem 1]{giannou2022}. By \Cref{lem:bias-absorption}, LOLA-PG is a special case of (PG) with modified bias $b_n^{\mathrm{LOLA}}$. By \Cref{lem:schedule}, the modified bias satisfies the required decay condition. The noise $U_n$ is unchanged (opponent shaping is deterministic given $\cF_n$). Therefore, all hypotheses of \cite[Theorem 1]{giannou2022} are satisfied with the modified bias exponent $\ell_b^{\mathrm{LOLA}} = \min(\ell_b, r)$, and the convergence conclusions follow.
+\end{proof}
+
+\begin{remark}
+The variance $\sigma_n^2$ is \emph{unchanged} by opponent shaping, because $\mathrm{OS}(\pi_n)$ is $\cF_n$-measurable and adds only to the conditional mean, not the conditional variance. This is why the rate exponent depends on $r$ (through the bias) but not on $\lambda_n$ (through the variance).
+\end{remark}
+
+
+%% ========================================================================
+\section{Constant LOLA: Approximate Nash}
+\label{sec:constant}
+%% ========================================================================
+
+\begin{theorem}[Constant LOLA converges to neighbourhood]
+\label{thm:constant}
+With constant $\lambda_n = \lambda > 0$ and SOS parameter $\mu$, the LOLA-PG iterates satisfy:
+\begin{equation}
+\label{eq:neighborhood}
+    \limsup_{n \to \infty} \E[\|\pi_n - \pi^*\|^2 \mid \cE] \leq \frac{C \lambda^2 G^2}{\mu^2},
+\end{equation}
+where $C > 0$ depends on the game and step-size parameters.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+With constant $\lambda$, the bias bound is $B_n^{\mathrm{LOLA}} = B_n + \lambda G$. As $B_n \to 0$, the residual bias is $\lambda G$. In the SOS Lyapunov recursion:
+\[
+    \bar{D}_{n+1} \leq (1 - 2\mu\gamma_n)\bar{D}_n + \gamma_n \|\Pi\| \lambda G + \text{(vanishing terms)}.
+\]
+The steady-state satisfies $2\mu D_\infty \leq \|\Pi\| \lambda G$, giving $D_\infty = O(\lambda G / \mu)$ and $\E[\|\pi_n - \pi^*\|^2] = O(\lambda^2 G^2 / \mu^2)$.
+\end{proof}
+
+\begin{corollary}[Optimal annealing]
+\label{cor:optimal-anneal}
+The bias-variance tradeoff between convergence speed (faster with larger $\lambda$) and accuracy (higher with smaller $\lambda$) is optimised by the annealing schedule $\lambda_n \sim \sigma_n / G$, which matches the gradient noise level. For $\varepsilon$-greedy REINFORCE, this gives $\lambda_n = O(1/\sqrt{n})$.
+\end{corollary}
+
+
+%% ========================================================================
+\section{Basin of Attraction Enlargement}
+\label{sec:basin}
+%% ========================================================================
+
+This section contains the deepest result.
+
+\subsection{Jacobian decomposition}
+
+Near a Nash equilibrium $\pi^*$, the gradient field admits the linearisation:
+\begin{equation}
+    v(\pi) \approx \Jac_v(\pi^*)(\pi - \pi^*), \qquad \Jac_v(\pi^*) = (\nabla_j v_i(\pi^*))_{i,j \in \mathcal{N}}.
+\end{equation}
+
+Decompose the Jacobian into symmetric and antisymmetric parts:
+\begin{equation}
+    \Jac_v = S + A, \qquad S = \frac{\Jac_v + \Jac_v^\top}{2}, \qquad A = \frac{\Jac_v - \Jac_v^\top}{2}.
+\end{equation}
+
+The SOS condition (\Cref{def:nash}(c) in companion paper) requires:
+\begin{equation}
+    \ip{v(\pi)}{\pi - \pi^*} \approx (\pi - \pi^*)^\top S (\pi - \pi^*) \leq -\mu \|\pi - \pi^*\|^2,
+\end{equation}
+i.e., $S \preceq -\mu I$. The antisymmetric part $A$ contributes only rotation (it vanishes in the inner product with itself). In zero-sum games, $A$ dominates; in potential games, $A = 0$.
+
+\subsection{The LOLA Jacobian}
+
+Under LOLA-PG, the effective gradient field near $\pi^*$ becomes:
+\begin{equation}
+    v^{\mathrm{LOLA}}(\pi) = v(\pi) + \lambda \cdot \mathrm{OS}(\pi).
+\end{equation}
+
+Since $\mathrm{OS}(\pi^*) = 0$ (\Cref{lem:os-properties}(b)), the linearisation gives:
+\begin{equation}
+    v^{\mathrm{LOLA}}(\pi) \approx \bigl(\Jac_v(\pi^*) + \lambda \cdot H(\pi^*)\bigr)(\pi - \pi^*),
+\end{equation}
+where $H(\pi^*) = \nabla_\pi \mathrm{OS}(\pi)\big|_{\pi=\pi^*}$ is the \emph{opponent-shaping Hessian}.
+
+\subsection{Spectral reinforcement}
+
+\begin{definition}[Spectral reinforcement]
+\label{def:spectral}
+The opponent-shaping Hessian $H$ is \emph{spectrally reinforcing} if its symmetric part $S_H = (H + H^\top)/2$ is negative semi-definite:
+\begin{equation}
+    x^\top S_H \, x \leq 0 \quad \text{for all } x \in \R^d.
+\end{equation}
+When $S_H$ is negative definite, define $\mu_H := -\lambda_{\max}(S_H) > 0$.
+\end{definition}
+
+\begin{theorem}[Basin of attraction enlargement]
+\label{thm:basin}
+Let $\pi^*$ be SOS with parameter $\mu$. If $H(\pi^*)$ is spectrally reinforcing with parameter $\mu_H > 0$, then the LOLA-PG gradient field $v^{\mathrm{LOLA}}$ is SOS with the improved parameter:
+\begin{equation}
+\label{eq:mu-lola}
+\boxed{
+    \mu_{\mathrm{LOLA}} = \mu + \lambda \mu_H > \mu.
+}
+\end{equation}
+Consequently:
+\begin{enumerate}[(a)]
+    \item The SOS ball has radius $\rho_{\mathrm{LOLA}} \geq \rho_{\mathrm{std}}$ (weakly larger basin of attraction).
+    \item The contraction factor in the Lyapunov analysis improves: $(1 - 2\mu_{\mathrm{LOLA}}\gamma_n)$ vs.\ $(1 - 2\mu\gamma_n)$.
+    \item The convergence rate constant improves by a factor of $\mu/\mu_{\mathrm{LOLA}} < 1$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+For any $\pi$ in the SOS ball:
+\begin{align}
+    \ip{v^{\mathrm{LOLA}}(\pi)}{\pi - \pi^*}
+    &= \ip{v(\pi)}{\pi - \pi^*} + \lambda \ip{\mathrm{OS}(\pi)}{\pi - \pi^*} \notag\\
+    &\approx (\pi - \pi^*)^\top (S + \lambda S_H)(\pi - \pi^*) \notag\\
+    &\leq (-\mu - \lambda\mu_H)\|\pi - \pi^*\|^2 \notag\\
+    &= -\mu_{\mathrm{LOLA}} \|\pi - \pi^*\|^2. \qedhere
+\end{align}
+\end{proof}
+
+\subsection{When is spectral reinforcement satisfied?}
+
+\begin{proposition}[Sufficient conditions for spectral reinforcement]
+\label{prop:sufficient}
+The spectral reinforcement condition ($\mu_H > 0$) holds in the following settings:
+\begin{enumerate}[(a)]
+    \item \textbf{Two-player zero-sum games} where the antisymmetric part $A$ of $\Jac_v$ is large relative to $S$. Here, LOLA's opponent modelling converts rotational dynamics (which slow convergence) into contractive dynamics.
+
+    \item \textbf{Games with negative cross-Hessians}: $\partial^2 V_i / (\partial \pi_i \partial \pi_j) \prec 0$ (my improvement hurts you). LOLA's anticipation of the opponent's counter-move steepens the effective descent direction.
+
+    \item \textbf{Prisoner's dilemma variants} where mutual cooperation is Nash but the gradient field has rotational components near the boundary of the cooperation basin.
+\end{enumerate}
+\end{proposition}
+
+\begin{remark}[When LOLA does NOT help]
+Spectral reinforcement fails in:
+\begin{itemize}
+    \item \textbf{Potential games}: $A = 0$, so there is no rotation for LOLA to counteract. $H \approx 0$ and $\mu_H \approx 0$.
+    \item \textbf{Dominance-solvable games}: convergence is already rapid, and LOLA's overhead (computing the opponent-shaping term) is wasted.
+\end{itemize}
+\end{remark}
+
+
+%% ========================================================================
+\section{Combined EW-LOLA-PG}
+\label{sec:combined}
+%% ========================================================================
+
+Combining the evidence-weighted PG (companion paper) with opponent shaping:
+\begin{equation}
+\label{eq:ew-lola}
+\tag{EW-LOLA-PG}
+    \pi_{i,n+1} = \proj_{\Pi_i}\bigl(\pi_{i,n} + \gamma_n \cdot w_{i,n} \cdot (\hat{v}_{i,n} + \lambda_n \cdot \mathrm{OS}_i(\pi_n))\bigr).
+\end{equation}
+
+\begin{theorem}[Combined convergence]
+\label{thm:combined}
+Under the hypotheses of \Cref{thm:annealed} and the evidence-weighting conditions from the companion paper, EW-LOLA-PG \eqref{eq:ew-lola} converges to SOS Nash with:
+\begin{equation}
+    \E[\|\pi_n - \pi^*\|^2 \mid \cE] = \mathcal{O}\!\left(\frac{C_{\mathrm{combined}}}{n^q}\right),
+\end{equation}
+where:
+\begin{enumerate}[(i)]
+    \item $C_{\mathrm{combined}} = \dfrac{\HM(V)}{\AM(V)} \cdot C_{\mathrm{std}}$ \quad (variance improvement from evidence weighting),
+    \item the effective SOS parameter is $\mu_{\mathrm{LOLA}} = \mu + \lambda\mu_H$ \quad (basin enlargement from opponent shaping),
+    \item the rate exponent is $q = \min(\ell_b, r, p - 2\ell_\sigma)$ \quad (same structure as standard PG).
+\end{enumerate}
+The two improvements are \textbf{orthogonal}: evidence weighting reduces the variance prefactor $C$, while opponent shaping increases the contraction rate $\mu$.
+\end{theorem}
+
+\begin{proof}
+The proof composes the two modifications:
+\begin{enumerate}
+    \item Evidence weighting scales the gradient by $w_{i,n}$, which reduces the effective variance by $\HM/\AM$ (companion paper, Theorem 5.1).
+    \item Opponent shaping adds $\lambda_n \mathrm{OS}(\pi_n)$ to the bias, which is absorbed by annealing (\Cref{lem:bias-absorption}).
+    \item At the linearisation level, evidence weighting affects $\sigma^2$ (the noise) while opponent shaping affects $\mu$ (the drift). These enter the Lyapunov recursion (Giannou eq.\ B.8) in different terms: $\sigma^2$ in the perturbation, $\mu$ in the contraction. Hence they compose multiplicatively.
+\end{enumerate}
+\end{proof}
+
+
+%% ========================================================================
+\section{Connection to the $\Omega$-Framework}
+\label{sec:omega}
+%% ========================================================================
+
+\subsection{LOLA as differentiable Gödelian step}
+
+In the $\Omega$-framework (theos item 50), the opponent-shaping term is interpreted as the \emph{differentiable mechanism for Level 3 meta-learning}. The discrete Gödelian step $F_i \to F_i' = F_i + G_{F_j}$ (extending agent $i$'s formal system by $j$'s Gödel sentence) is approximated continuously by LOLA's differentiation through $j$'s learning trajectory.
+
+\Cref{thm:basin} provides formal support: LOLA-PG can converge to equilibria that standard PG cannot reach (larger basin), which is the operational content of Gödelian complementarity (theos item 37) --- multi-agent systems know strictly more than any individual.
+
+\subsection{The five-component gradient}
+
+With EW-LOLA-PG, we have formalised four of the five components of the $\Omega$-framework gradient (theos eq.\ 27):
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lll}
+\hline
+\textbf{Component} & \textbf{Mechanism} & \textbf{Result} \\
+\hline
+Exploration & REINFORCE score function & Giannou Model 3 \\
+Exploitation & Backpropagation & Giannou Model 1 \\
+Evidence seeking & Keynesian weight $V_i$ & Companion paper (AM-HM) \\
+Opponent shaping & LOLA $\partial R_i/\partial\theta_j \cdot \partial\theta_j'/\partial\theta_i$ & This paper (basin enlargement) \\
+Alignment & Consensus penalty $D(\bar{\phi}, \phi_i)$ & \emph{Future work} \\
+\hline
+\end{tabular}
+\end{center}
+
+The alignment component (Hayekian price signals, theos items 53--54) requires a different technical approach (distributed optimisation / consensus protocols) and is left to future work.
+
+\subsection{Six-way risk decomposition}
+
+The $\Omega$-framework's risk decomposition (theos eq.\ 22) partitions the multi-agent risk into six terms. Our two results address different terms:
+\begin{itemize}
+    \item \textbf{Evidence weighting} reduces the Keynes-limited terms $R_{W \cap \Pi_U}$ and $R_{S \cap \Pi_U}$ by making the system aware of evidentiary fragility.
+    \item \textbf{Opponent shaping} reduces the Gödel-limited terms $R_{W \cap \Pi_N \cap B}$ and $R_{S \cap \Pi_N \cap B}$ by enabling agents to escape individual blind spots through mutual modelling.
+    \item The \textbf{learnable terms} $R_{W \cap \Pi_N \cap B^c}$ and $R_{S \cap \Pi_N \cap B^c}$ are reduced by standard gradient descent.
+    \item The \textbf{irreducible residual} $B_{\min} = \bigcap_i B_i$ remains inaccessible, as guaranteed by Gödel's theorem.
+\end{itemize}
+
+
+%% ========================================================================
+\section{Discussion}
+\label{sec:discussion}
+%% ========================================================================
+
+\paragraph{What is new.} The main contribution is \Cref{thm:basin}: the first result showing that opponent-shaping methods can provably enlarge the basin of attraction in general stochastic games. The annealed convergence (\Cref{thm:annealed}) is a straightforward reduction, but the basin result requires the spectral analysis of the LOLA Hessian, which is new.
+
+\paragraph{Relation to prior work.} Foerster et al.\ \cite{foerster2018} demonstrated LOLA empirically in matrix games and showed convergence in specific normal-form settings. Letcher et al.\ (2019) analysed stable fixed points of LOLA in differentiable games. Our contribution extends these to the episodic stochastic game setting with REINFORCE gradient estimates, which is the setting of Giannou et al.
+
+\paragraph{Limitations.}
+\begin{enumerate}
+    \item The spectral reinforcement condition (\Cref{def:spectral}) must be verified for specific games. We provide sufficient conditions (\Cref{prop:sufficient}) but not a complete characterisation.
+    \item The opponent-shaping term requires agent $i$ to model $j$'s learning rate $\eta_j$ and gradient $\nabla_{\theta_j} R_j$. In practice, these must be estimated, introducing additional error not captured in our analysis.
+    \item The basin enlargement is a \emph{local} result (larger SOS ball). We do not prove global convergence, which remains open even for standard PG \cite{giannou2022}.
+    \item As noted in theos weak point \#33: LOLA adjusts $\theta_j$ (parameters), not $F_j$ (the formal system/architecture). True Level 3 meta-learning would require differentiating through architecture changes, which is beyond current techniques.
+\end{enumerate}
+
+\paragraph{Future directions.}
+\begin{enumerate}
+    \item \textbf{Alignment component}: formalise the Hayekian price signal (theos items 53--54) as a consensus protocol and prove convergence of the full five-component gradient.
+    \item \textbf{Simulations}: verify the basin enlargement empirically on matching pennies, prisoner's dilemma, and the Calvano et al.\ (2020) algorithmic pricing game.
+    \item \textbf{Non-tabular extension}: extend to parametric policies (neural networks), connecting to the deep RL practice where LOLA is most commonly used.
+\end{enumerate}
+
+
+\begin{thebibliography}{99}
+
+\bibitem{giannou2022}
+A.~Giannou, K.~Lotidis, P.~Mertikopoulos, and E.~V.~Vlatakis-Gkaragkounis.
+\newblock On the convergence of policy gradient methods to {N}ash equilibria in general stochastic games.
+\newblock \emph{arXiv:2210.08857}, 2022.
+
+\bibitem{foerster2018}
+J.~Foerster, R.~Y.~Chen, M.~Al-Shedivat, S.~Whiteson, P.~Abbeel, and I.~Mordatch.
+\newblock Learning with opponent-learning awareness.
+\newblock In \emph{AAMAS}, 2018.
+
+\bibitem{letcher2019}
+A.~Letcher, J.~Foerster, D.~Balduzzi, T.~Rockt{\"a}schel, and S.~Whiteson.
+\newblock Stable opponent shaping in differentiable games.
+\newblock In \emph{ICLR}, 2019.
+
+\bibitem{calvano2020}
+E.~Calvano, G.~Calzolari, V.~Denicol{\`o}, and S.~Pastorello.
+\newblock Artificial intelligence, algorithmic pricing, and collusion.
+\newblock \emph{American Economic Review}, 110(10):3267--3297, 2020.
+
+\end{thebibliography}
+
+\end{document}

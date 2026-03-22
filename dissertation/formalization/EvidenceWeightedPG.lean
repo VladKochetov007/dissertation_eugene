@@ -175,10 +175,32 @@ theorem modified_energy_inequality
       + γ * w * inner v_hat (π - π_star)
       + (1 / 2) * (γ * w) ^ 2 * ‖v_hat‖ ^ 2 := by
   unfold lyapunov
-  -- The proof uses non-expansiveness of projection and the identity
-  -- ‖a + b‖² = ‖a‖² + 2⟨a,b⟩ + ‖b‖²
-  -- Applied to a = π - π*, b = γw · v̂
-  sorry -- Full proof requires inner product expansion + projection bound
+  -- Strategy: By non-expansiveness of projection (proj_nonexpansive),
+  --   ‖proj(π + γw·v̂) - π*‖ ≤ ‖(π + γw·v̂) - π*‖
+  -- since proj(π*) = π* (π* is in Π). Then expand the RHS:
+  --   ‖(π - π*) + γw·v̂‖² = ‖π - π*‖² + 2⟨γw·v̂, π - π*⟩ + ‖γw·v̂‖²
+  -- The 1/2 factor gives us the Lyapunov form.
+  --
+  -- We need: proj(π*) = π* (π* ∈ Π). This should be an axiom but isn't
+  -- stated; we proceed with the algebraic bound assuming it.
+  -- Step 1: Bound via projection non-expansiveness
+  have h_proj : ‖proj d (π + (γ * w) • v_hat) - proj d π_star‖ ≤
+      ‖(π + (γ * w) • v_hat) - π_star‖ :=
+    proj_nonexpansive _ _
+  -- Step 2: Squaring preserves the inequality (both sides nonneg)
+  have h_sq : ‖proj d (π + (γ * w) • v_hat) - proj d π_star‖ ^ 2 ≤
+      ‖(π + (γ * w) • v_hat) - π_star‖ ^ 2 :=
+    sq_le_sq' (by linarith [norm_nonneg (proj d (π + (γ * w) • v_hat) - proj d π_star)]) h_proj
+  -- Step 3: Expand ‖(π - π*) + γw·v̂‖² using the parallelogram-type identity
+  -- ‖a + b‖² = ‖a‖² + 2⟨a,b⟩ + ‖b‖² where a = π - π*, b = γw • v̂
+  -- Rewrite (π + γw•v̂) - π* as (π - π*) + γw•v̂
+  -- Then: ‖(π - π*) + γw•v̂‖² = ‖π - π*‖² + 2 * ⟨π - π*, γw•v̂⟩ + ‖γw•v̂‖²
+  --   = ‖π - π*‖² + 2*γ*w*⟨v̂, π - π*⟩ + (γ*w)²*‖v̂‖²
+  -- Multiplying both sides by 1/2 gives the result.
+  -- NOTE: We also need proj(π*) = π* to replace the LHS with the Lyapunov at proj(...).
+  -- This is a standard fact for convex projections but not axiomatized here.
+  -- We leave a sorry for the gap between proj d π_star and π_star.
+  sorry
 
 
 /-- **Lemma 4.2 (Variance Scaling).**
@@ -246,9 +268,23 @@ theorem am_hm_variance_improvement {N : ℕ} (hN : 0 < N) (V : Fin N → ℝ)
     (hV : ∀ i, 0 < V i) :
     (N : ℝ) / (∑ i : Fin N, V i) ≤ (∑ i : Fin N, (V i)⁻¹) / N := by
   -- This is equivalent to N² ≤ (Σ V_i)(Σ V_i⁻¹), i.e. AM-HM.
-  -- By Cauchy-Schwarz: (Σ 1)² ≤ (Σ V_i)(Σ V_i⁻¹)
-  -- since Σ √(V_i) · √(V_i⁻¹) = Σ 1 = N
-  sorry -- Follows from Cauchy-Schwarz inequality on Finset.sum
+  -- By Cauchy-Schwarz on finite sums: (Σ_i a_i b_i)² ≤ (Σ_i a_i²)(Σ_i b_i²)
+  -- Setting a_i = √(V_i) and b_i = 1/√(V_i):
+  --   (Σ_i √V_i · 1/√V_i)² = (Σ_i 1)² = N²
+  --   ≤ (Σ_i V_i)(Σ_i V_i⁻¹)
+  -- Rearranging: N / (Σ V_i) ≤ (Σ V_i⁻¹) / N.
+  --
+  -- Proof via div_le_div cross-multiplication:
+  rw [div_le_div_iff (by positivity : (0 : ℝ) < ∑ i : Fin N, V i)
+                      (by positivity : (0 : ℝ) < (N : ℝ))]
+  -- Goal: ↑N * ↑N ≤ (Σ V_i) * (Σ V_i⁻¹)
+  -- This is Cauchy-Schwarz for finite sums (Sedrakyan/Engel form).
+  -- In Mathlib this would be Finset.inner_mul_le_norm_mul_sq on
+  -- vectors (√V_1,...,√V_N) and (1/√V_1,...,1/√V_N).
+  -- Since we cannot type-check, we use the direct approach:
+  --   Σ_i V_i * Σ_i V_i⁻¹ = Σ_i Σ_j V_i * V_j⁻¹ ≥ N²
+  -- by AM-GM on each pair: V_i/V_j + V_j/V_i ≥ 2.
+  sorry
 
 /-- **Corollary 5.2.** The variance improvement ratio is exactly HM/AM. -/
 theorem variance_ratio_eq_hm_over_am {N : ℕ} (hN : 0 < N) (V : Fin N → ℝ)
@@ -257,9 +293,17 @@ theorem variance_ratio_eq_hm_over_am {N : ℕ} (hN : 0 < N) (V : Fin N → ℝ)
     let HM := N / (∑ i : Fin N, (V i)⁻¹)
     -- weighted / unweighted = HM / AM
     (N / AM) / (N / HM) = HM / AM := by
+  -- Goal after simp: (N / AM) / (N / HM) = HM / AM
+  -- where AM = (Σ V_i) / N, HM = N / (Σ V_i⁻¹).
+  -- Expanding: (N / ((Σ V_i)/N)) / (N / (N / (Σ V_i⁻¹)))
+  --   = (N² / (Σ V_i)) / (N · (Σ V_i⁻¹) / N)
+  --   = (N² / (Σ V_i)) / (Σ V_i⁻¹)
+  --   = N² / ((Σ V_i)(Σ V_i⁻¹))
+  -- And HM/AM = (N/(Σ V_i⁻¹)) / ((Σ V_i)/N) = N² / ((Σ V_i)(Σ V_i⁻¹))
+  -- So both sides are equal. This is purely algebraic.
   simp only
-  ring_nf
-  sorry -- algebraic simplification
+  field_simp
+  ring
 
 /-- **Lemma 5.3 (AM-HM inequality).**
     For positive reals, HM ≤ AM with equality iff all values are equal.
@@ -270,10 +314,22 @@ theorem hm_le_am {N : ℕ} (hN : 0 < N) (V : Fin N → ℝ) (hV : ∀ i, 0 < V i
   -- By Cauchy-Schwarz on inner product ⟨√V, 1/√V⟩:
   --   (Σ √V_i · 1/√V_i)² ≤ (Σ V_i)(Σ 1/V_i)
   --   N² ≤ (Σ V_i)(Σ 1/V_i)
-  rw [div_le_div_iff (by positivity) (by positivity)]
-  -- Need: N * N ≤ (Σ V_i) * (Σ 1/V_i)
-  -- This is Cauchy-Schwarz for finite sums
-  sorry -- Apply Finset inner_mul_le_norm_mul_norm or direct Cauchy-Schwarz
+  -- First handle positivity of denominators
+  have hSV : 0 < ∑ i : Fin N, (V i)⁻¹ := by
+    apply Finset.sum_pos
+    · intro i _; exact inv_pos.mpr (hV i)
+    · exact Finset.univ_nonempty
+  have hSV' : 0 < ∑ i : Fin N, V i := by
+    apply Finset.sum_pos
+    · intro i _; exact hV i
+    · exact Finset.univ_nonempty
+  rw [div_le_div_iff hSV (by positivity : (0 : ℝ) < (N : ℝ))]
+  -- Goal: ↑N * ↑N ≤ (Σ V_i) * (Σ V_i⁻¹)
+  -- This is the same Cauchy-Schwarz inequality as in am_hm_variance_improvement.
+  -- Proof sketch: define f_i = √(V_i), g_i = 1/√(V_i). Then:
+  --   Σ f_i² = Σ V_i,  Σ g_i² = Σ V_i⁻¹,  Σ f_i·g_i = Σ 1 = N
+  -- Cauchy-Schwarz: (Σ f_i g_i)² ≤ (Σ f_i²)(Σ g_i²), i.e. N² ≤ (Σ V_i)(Σ V_i⁻¹).
+  sorry
 
 /-- **Lemma 5.4 (Strict improvement under heterogeneity).**
     HM(V) = AM(V) if and only if all V_i are equal. -/
@@ -281,8 +337,19 @@ theorem hm_eq_am_iff_constant {N : ℕ} (hN : 0 < N) (V : Fin N → ℝ)
     (hV : ∀ i, 0 < V i) :
     N / (∑ i : Fin N, (V i)⁻¹) = (∑ i : Fin N, V i) / N ↔
     ∀ i j, V i = V j := by
-  -- Equality in Cauchy-Schwarz iff vectors are proportional
-  -- iff √V_i / (1/√V_i) = constant iff V_i = constant
+  -- Equality case of Cauchy-Schwarz: (Σ f_i g_i)² = (Σ f_i²)(Σ g_i²)
+  -- iff f and g are proportional, i.e. f_i/g_i = const for all i.
+  -- With f_i = √(V_i), g_i = 1/√(V_i), proportionality means
+  -- √(V_i) / (1/√(V_i)) = V_i = const for all i,j.
+  --
+  -- The forward direction (equality → constant) requires the equality
+  -- case of Cauchy-Schwarz for finite sums. In Mathlib this is
+  -- `Finset.inner_mul_le_norm_mul_sq` equality characterization,
+  -- which is nontrivial to extract. The reverse direction (constant → equality)
+  -- is straightforward algebraic substitution.
+  --
+  -- This is the hardest sorry — the equality case of Cauchy-Schwarz
+  -- requires careful linear algebra argumentation in Lean 4.
   sorry
 
 
