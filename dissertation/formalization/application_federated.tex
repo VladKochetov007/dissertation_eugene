@@ -1,0 +1,893 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{enumerate}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+\usepackage{booktabs}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+
+\DeclareMathOperator{\proj}{proj}
+\DeclareMathOperator{\AM}{AM}
+\DeclareMathOperator{\HM}{HM}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\cF}{\mathcal{F}}
+\newcommand{\cG}{\mathcal{G}}
+\newcommand{\cS}{\mathcal{S}}
+\newcommand{\cC}{\mathcal{C}}
+\newcommand{\cD}{\mathcal{D}}
+\newcommand{\ip}[2]{\langle #1, #2 \rangle}
+\newcommand{\norm}[1]{\|#1\|}
+
+\title{Evidence-Weighted Federated Averaging:\\
+An Application of the $\Omega$-Framework\\to Federated Learning}
+\author{Eugene Shcherbinin\\
+\small BSc Mathematics, London School of Economics\\
+\small Candidate 007}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We apply the $\Omega$-framework (Evidence-Weighted Multi-Agent Policy Gradient)
+to federated learning (FL). The mapping is precise: FL clients are agents,
+data heterogeneity across clients is evidence variance $V_i$, gradient
+compression is the lossy communication channel, and client selection is
+coalition formation. Replacing FedAvg's uniform aggregation with the evidence
+weight $w_i = V_{\min}/V_i$ yields \emph{Evidence-Weighted Federated Averaging}
+(EW-FedAvg), which achieves a variance improvement factor of
+$\HM(V)/\AM(V) \leq 1$ over standard FedAvg. The self-knowledge bottleneck
+from the cooperative PG framework transfers directly: clients with highly
+non-IID data cannot improve their contribution to the global model through
+bandwidth alone --- they need more \emph{local data}. We prove communication-adjusted
+convergence rates, connect sparsified gradient communication to the blessing
+of dimensionality, and show that evidence-weighted client selection subsumes
+and unifies the robustness mechanisms of SCAFFOLD and FedProx.
+\end{abstract}
+
+\tableofcontents
+
+%% ========================================================================
+\section{Introduction}
+\label{sec:intro}
+%% ========================================================================
+
+Federated learning~\cite{mcmahan2017} trains a shared model across $K$
+clients without centralizing data. The canonical algorithm, FedAvg,
+aggregates client updates using weights proportional to local dataset size
+$n_i / n$, where $n = \sum_i n_i$. This weighting is optimal when client
+data distributions are identical (IID). In practice, client data is
+heterogeneous (non-IID), and uniform-style aggregation produces a biased
+global model that converges slowly or diverges~\cite{karimireddy2020,li2020fedprox}.
+
+The $\Omega$-framework~\cite{ewpg2026} was developed for multi-agent
+reinforcement learning, where agents with heterogeneous observation quality
+coordinate through lossy channels. Its core mechanism --- the evidence weight
+$w_i = V_{\min}/V_i$ measuring each agent's information quality --- transfers
+to federated learning with minimal modification. In this paper, we make this
+transfer precise and derive its consequences.
+
+\textbf{Contributions.}
+\begin{enumerate}[(1)]
+  \item A formal isomorphism between the $\Omega$-framework and federated
+    learning (\Cref{sec:isomorphism}).
+  \item Evidence-Weighted FedAvg with a $\HM(V)/\AM(V)$ variance improvement
+    theorem (\Cref{sec:ew-fedavg}).
+  \item Communication efficiency analysis via the self-knowledge bottleneck,
+    with connections to sparse recovery (\Cref{sec:communication}).
+  \item Client selection as coalition formation with evidence-weighted
+    rationality criteria (\Cref{sec:coalition}).
+  \item Non-IID robustness analysis unifying SCAFFOLD and FedProx under the
+    evidence-weighting lens (\Cref{sec:noniid}).
+\end{enumerate}
+
+
+%% ========================================================================
+\section{The Isomorphism}
+\label{sec:isomorphism}
+%% ========================================================================
+
+\subsection{Setup: Federated Learning}
+
+Consider $K$ clients, each holding a local dataset $\cD_i$ drawn from a
+(possibly distinct) distribution $P_i$ over input-label pairs $(x, y)$.
+The global objective is:
+\begin{equation}\label{eq:fl-objective}
+  \min_{\theta \in \R^d}\; F(\theta) := \sum_{i=1}^{K} p_i\, F_i(\theta),
+  \qquad F_i(\theta) := \E_{(x,y) \sim P_i}[\ell(\theta; x, y)],
+\end{equation}
+where $p_i \geq 0$, $\sum_i p_i = 1$ are aggregation weights (typically
+$p_i = n_i / n$), and $\ell$ is the loss function.
+
+At each communication round $t$, FedAvg~\cite{mcmahan2017} proceeds:
+\begin{enumerate}[(i)]
+  \item Server broadcasts current model $\theta^t$ to selected clients.
+  \item Each selected client $i$ runs $\tau$ steps of SGD on $F_i$,
+    producing a local update $\Delta_i^t = \theta_i^t - \theta^t$.
+  \item Server aggregates: $\theta^{t+1} = \theta^t + \sum_{i \in S_t} p_i \Delta_i^t$.
+\end{enumerate}
+
+\subsection{The $\Omega$--FL Correspondence}
+
+\begin{table}[h]
+\centering
+\caption{Precise mapping between the $\Omega$-framework and federated learning.}
+\label{tab:isomorphism}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{$\Omega$-Framework} & \textbf{Federated Learning} & \textbf{Formal Correspondence} \\
+\midrule
+Agent $i \in \{1,\ldots,N\}$ & Client $i \in \{1,\ldots,K\}$ & $N = K$ \\[3pt]
+Policy $\pi_i \in \Pi_i$ & Local model $\theta_i \in \R^d$ & $\Pi_i = \R^d$ \\[3pt]
+Joint policy $\pi \in \Pi$ & Global model $\theta \in \R^d$ & $\theta = \sum_i p_i \theta_i$ \\[3pt]
+Policy gradient $\hat{v}_i$ & Local gradient $g_i = \nabla F_i(\theta)$ & $\hat{v}_i \leftrightarrow g_i$ \\[3pt]
+Evidence variance $V_i$ & Gradient variance $\sigma_i^2$ & $V_i = \sigma_i^2$ \\[3pt]
+ & ~~$= \E[\norm{g_i - \nabla F(\theta)}^2]$ & \\[3pt]
+Evidence weight $w_i = V_{\min}/V_i$ & Client quality weight & $w_i = \sigma_{\min}^2 / \sigma_i^2$ \\[3pt]
+Lossy comm.\ channel & Gradient compression & Quantization, sparsification \\[3pt]
+Self-knowledge $\hat{\pi}_i$ & Client's local model & Drift $\norm{\theta_i - \theta}$ \\[3pt]
+Self-knowledge loss $L_{\text{self}}^{(i)}$ & Client drift & $\E[\norm{\theta_i^t - \theta^t}^2]$ \\[3pt]
+Coalition $S \subseteq \{1,\ldots,N\}$ & Selected client set $S_t$ & $S = S_t$ \\[3pt]
+Nash equilibrium $\pi^*$ & Global optimum $\theta^*$ & $\nabla F(\theta^*) = 0$ \\[3pt]
+Lyapunov $D(\pi) = \frac{1}{2}\norm{\pi - \pi^*}^2$
+  & Suboptimality $F(\theta) - F(\theta^*)$ & Convergence measure \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{remark}[Evidence variance = gradient heterogeneity]
+The evidence variance $V_i$ in the $\Omega$-framework measures the
+noise-to-signal ratio of agent~$i$'s gradient estimate. In FL, the
+natural counterpart is the \emph{gradient divergence}:
+\begin{equation}\label{eq:grad-div}
+  \sigma_i^2 := \E\bigl[\norm{\nabla F_i(\theta) - \nabla F(\theta)}^2\bigr],
+\end{equation}
+which is driven by two sources: (a)~stochastic noise from mini-batch
+sampling, and (b)~\emph{distribution heterogeneity} $P_i \neq P_j$.
+Under IID data, $\sigma_i^2$ reduces to mini-batch variance; under
+non-IID data, it is dominated by the distribution shift. This is
+precisely the structure the $\Omega$-framework was built to handle.
+\end{remark}
+
+\begin{definition}[Gradient heterogeneity measures]\label{def:heterogeneity}
+For FL with $K$ clients:
+\begin{align}
+  \sigma_i^2 &:= \E\bigl[\norm{\nabla F_i(\theta) - \nabla F(\theta)}^2\bigr]
+    &&\text{(client-level variance)}, \label{eq:sigma-i}\\
+  \bar{\sigma}^2 &:= \sum_{i=1}^{K} p_i\, \sigma_i^2
+    &&\text{(average variance = $\AM(\sigma^2)$)}, \label{eq:sigma-bar}\\
+  \sigma_{\min}^2 &:= \min_{i} \sigma_i^2
+    &&\text{(best-informed client)}. \label{eq:sigma-min}
+\end{align}
+\end{definition}
+
+
+%% ========================================================================
+\section{Evidence-Weighted Federated Averaging}
+\label{sec:ew-fedavg}
+%% ========================================================================
+
+\subsection{The Aggregation Rule}
+
+Standard FedAvg aggregates with weights $p_i = n_i / n$ (proportional to
+data size). We replace this with the evidence-weighted aggregation:
+
+\begin{definition}[Evidence-Weighted FedAvg]\label{def:ew-fedavg}
+At communication round $t$, the server computes:
+\begin{equation}\label{eq:ew-agg}
+  \theta^{t+1} = \theta^t + \sum_{i \in S_t} \tilde{w}_i\, \Delta_i^t,
+  \qquad \tilde{w}_i = \frac{w_i}{\sum_{j \in S_t} w_j},
+  \qquad w_i = \frac{\sigma_{\min}^2}{\sigma_i^2}.
+\end{equation}
+\end{definition}
+
+\noindent Clients with lower gradient variance (higher evidence quality)
+receive higher aggregation weight. The normalization $\sum_i \tilde{w}_i = 1$
+preserves the averaging property. When all $\sigma_i^2$ are equal, $w_i = 1$
+for all~$i$ and EW-FedAvg reduces to uniform averaging.
+
+\subsection{Variance Improvement}
+
+\begin{theorem}[EW-FedAvg variance improvement]\label{thm:ew-variance}
+Let $g_i^t = \nabla F_i(\theta^t) + \xi_i^t$ be the stochastic gradient of
+client~$i$, with $\E[\xi_i^t] = 0$ and
+$\E[\norm{g_i^t - \nabla F(\theta^t)}^2] = \sigma_i^2$. Then the aggregated
+gradient under EW-FedAvg satisfies:
+\begin{equation}\label{eq:ew-var-bound}
+  \E\Bigl[\Bigl\|\sum_{i=1}^{K} \tilde{w}_i\, g_i^t - \nabla F(\theta^t)\Bigr\|^2\Bigr]
+  \;\leq\; \frac{\HM(\sigma^2)}{\AM(\sigma^2)} \cdot \bar{\sigma}^2
+  \;\leq\; \bar{\sigma}^2,
+\end{equation}
+where $\HM(\sigma^2) = K / \bigl(\sum_{i=1}^K 1/\sigma_i^2\bigr)$ and
+$\AM(\sigma^2) = (1/K)\sum_{i=1}^K \sigma_i^2$. The ratio
+$\HM(\sigma^2)/\AM(\sigma^2) \leq 1$ with equality iff all $\sigma_i^2$ are
+identical.
+\end{theorem}
+
+\begin{proof}
+The aggregated gradient error is:
+\begin{align}
+  \E\Bigl[\Bigl\|\sum_i \tilde{w}_i g_i - \nabla F\Bigr\|^2\Bigr]
+  &= \sum_i \tilde{w}_i^2 \,\sigma_i^2
+  \label{eq:ew-step1}
+\end{align}
+where the cross terms vanish since gradient errors across clients are
+independent conditional on $\theta^t$ (clients sample from independent
+local datasets). The weights are $\tilde{w}_i = w_i / W$ with
+$W = \sum_j w_j = \sigma_{\min}^2 \sum_j 1/\sigma_j^2$, so:
+\begin{equation}
+  \tilde{w}_i^2 \,\sigma_i^2
+  = \frac{(\sigma_{\min}^2)^2}{\sigma_i^4} \cdot \frac{\sigma_i^2}{W^2}
+  = \frac{(\sigma_{\min}^2)^2}{\sigma_i^2 \, W^2}.
+\end{equation}
+Summing:
+\begin{equation}
+  \sum_i \tilde{w}_i^2 \sigma_i^2
+  = \frac{(\sigma_{\min}^2)^2}{W^2} \sum_i \frac{1}{\sigma_i^2}
+  = \frac{(\sigma_{\min}^2)^2}{W^2} \cdot \frac{W}{\sigma_{\min}^2}
+  = \frac{\sigma_{\min}^2}{W}
+  = \frac{1}{\sum_i 1/\sigma_i^2}.
+  \label{eq:ew-sum}
+\end{equation}
+This is $\HM(\sigma^2) / K$. Now, uniform averaging gives
+$\bar{\sigma}^2 / K = \AM(\sigma^2) / K$ (each client weighted $1/K$,
+contributing $\sigma_i^2 / K^2$, summing to $\AM(\sigma^2)/K$). Therefore:
+\begin{equation}
+  \frac{\text{EW-FedAvg variance}}{\text{FedAvg variance}}
+  = \frac{\HM(\sigma^2) / K}{\AM(\sigma^2) / K}
+  = \frac{\HM(\sigma^2)}{\AM(\sigma^2)} \leq 1,
+\end{equation}
+where the final inequality is the HM-AM inequality. Equality holds iff
+all $\sigma_i^2$ are equal.
+\end{proof}
+
+\begin{remark}[Magnitude of improvement]
+If $K = 2$ clients have $\sigma_1^2 = 1$ and $\sigma_2^2 = 100$, then:
+\[
+  \frac{\HM}{\AM} = \frac{2/(1 + 1/100)}{(1+100)/2}
+  = \frac{200/101}{101/2} = \frac{400}{10201} \approx 0.039.
+\]
+The variance is reduced by a factor of $\sim\!25\times$. Highly heterogeneous
+settings produce the largest gains --- precisely the regime where FedAvg
+struggles most.
+\end{remark}
+
+\subsection{Convergence of EW-FedAvg}
+
+\begin{theorem}[Convergence rate of EW-FedAvg]\label{thm:ew-convergence}
+Assume $F$ is $L$-smooth, each $F_i$ is $\mu$-strongly convex, and
+$\E[\norm{g_i - \nabla F_i}^2] \leq \sigma_{\text{sgd}}^2$ (mini-batch
+noise). After $T$ communication rounds with $\tau$ local SGD steps each
+and step size $\eta = 1 / (4L\tau)$:
+\begin{equation}\label{eq:ew-conv-rate}
+  \E[F(\theta^T)] - F^*
+  \;\leq\; \underbrace{\left(1 - \frac{\mu}{4L}\right)^T}_{\text{linear contraction}}
+  \cdot (F(\theta^0) - F^*)
+  \;+\; \frac{8L}{\mu^2}\left(
+    \frac{\sigma_{\text{sgd}}^2}{K\tau}
+    + \tau\,\frac{\HM(\sigma^2)}{\AM(\sigma^2)}\,\bar{\sigma}^2
+  \right).
+\end{equation}
+Compare FedAvg~\cite{karimireddy2020}, where the second floor term is
+$\tau\,\bar{\sigma}^2$ (no $\HM/\AM$ factor).
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Follow the standard FedAvg analysis of Karimireddy et al.~\cite{karimireddy2020},
+replacing uniform aggregation weights $p_i = 1/K$ with evidence weights
+$\tilde{w}_i$. The $L$-smoothness descent lemma gives:
+\[
+  \E[F(\theta^{t+1})] \leq F(\theta^t)
+    - \frac{\eta\tau}{2}\norm{\nabla F(\theta^t)}^2
+    + \frac{L\eta^2\tau}{2}\sigma_{\text{sgd}}^2
+    + \frac{L\eta^2\tau^2}{2}\sum_i \tilde{w}_i^2\,\sigma_i^2.
+\]
+The final term is bounded by $\HM(\sigma^2)/(K) \cdot L\eta^2\tau^2 / 2$
+via~\eqref{eq:ew-sum}. Telescoping and using strong convexity yields
+\eqref{eq:ew-conv-rate}.
+\end{proof}
+
+\subsection{Algorithm}
+
+\begin{algorithm}[H]
+\caption{Evidence-Weighted Federated Averaging (EW-FedAvg)}
+\label{alg:ew-fedavg}
+\SetAlgoLined
+\KwIn{Initial model $\theta^0$, $K$ clients, local epochs $\tau$,
+  learning rate $\eta$, communication rounds $T$}
+\KwOut{Trained global model $\theta^T$}
+
+\tcp{Server estimates client variances (one-time or periodic)}
+\For{$i = 1, \ldots, K$}{
+  $\hat{\sigma}_i^2 \gets \textsc{EstimateVariance}(i, \theta^0)$\;
+}
+$\hat{\sigma}_{\min}^2 \gets \min_i \hat{\sigma}_i^2$\;
+
+\BlankLine
+\For{$t = 0, 1, \ldots, T-1$}{
+  \tcp{Client selection (coalition formation)}
+  $S_t \gets \textsc{SelectClients}(\{w_i\}_{i=1}^K)$\;
+  Broadcast $\theta^t$ to all $i \in S_t$\;
+
+  \BlankLine
+  \tcp{Local training}
+  \For(\tcp*[f]{in parallel}){each $i \in S_t$}{
+    $\theta_i^{t,0} \gets \theta^t$\;
+    \For{$k = 0, \ldots, \tau - 1$}{
+      Sample mini-batch $\xi_i \sim \cD_i$\;
+      $\theta_i^{t,k+1} \gets \theta_i^{t,k} - \eta\,\nabla F_i(\theta_i^{t,k}; \xi_i)$\;
+    }
+    $\Delta_i^t \gets \theta_i^{t,\tau} - \theta^t$\;
+    \tcp{Optional: sparsify $\Delta_i^t$ (Section~\ref{sec:communication})}
+  }
+
+  \BlankLine
+  \tcp{Evidence-weighted aggregation}
+  $w_i \gets \hat{\sigma}_{\min}^2 / \hat{\sigma}_i^2$ for each $i \in S_t$\;
+  $W \gets \sum_{i \in S_t} w_i$\;
+  $\theta^{t+1} \gets \theta^t + \sum_{i \in S_t} \frac{w_i}{W}\,\Delta_i^t$\;
+}
+\Return{$\theta^T$}\;
+\end{algorithm}
+
+
+%% ========================================================================
+\section{Communication Efficiency and the Self-Knowledge Bottleneck}
+\label{sec:communication}
+%% ========================================================================
+
+\subsection{The Self-Knowledge Bottleneck in FL}
+
+The cooperative PG framework established that an agent's ability to
+communicate its policy is fundamentally limited by its self-knowledge.
+In FL, the analogous statement is:
+
+\begin{definition}[Client drift as self-knowledge loss]\label{def:drift}
+After $\tau$ local SGD steps, client~$i$'s drift from the global model is:
+\begin{equation}\label{eq:drift}
+  \Delta_{\text{drift}}^{(i)} := \E\bigl[\norm{\theta_i^{t,\tau} - \theta^t}^2\bigr].
+\end{equation}
+This is the FL analogue of the self-knowledge loss $L_{\text{self}}^{(i)}$:
+the local model $\theta_i$ is client~$i$'s ``self-model'' of its
+contribution to the global objective.
+\end{definition}
+
+\begin{proposition}[Drift--heterogeneity relationship]\label{prop:drift-bound}
+Under $L$-smooth local objectives with step size $\eta \leq 1/L$:
+\begin{equation}\label{eq:drift-var}
+  \Delta_{\text{drift}}^{(i)} \;\leq\; \tau^2 \eta^2\,\sigma_i^2 + \tau\eta^2\,\sigma_{\text{sgd}}^2.
+\end{equation}
+The first term is driven by distribution heterogeneity; the second by
+stochastic noise.
+\end{proposition}
+
+\begin{proof}
+By $L$-smoothness and the SGD recursion:
+\begin{align}
+  \theta_i^{t,k+1} - \theta^t
+  &= \theta_i^{t,k} - \theta^t - \eta\,\nabla F_i(\theta_i^{t,k}; \xi_i^k).
+\end{align}
+Taking expectations and using $\E[\nabla F_i(\theta_i^{t,k}; \xi)] = \nabla F_i(\theta_i^{t,k})$,
+then bounding $\norm{\nabla F_i(\theta^t) - \nabla F(\theta^t)} \leq \sigma_i$
+and applying the standard SGD drift analysis~\cite{karimireddy2020}
+yields~\eqref{eq:drift-var}.
+\end{proof}
+
+\begin{corollary}[Self-knowledge bottleneck in FL]\label{cor:fl-bottleneck}
+The useful information in client~$i$'s update $\Delta_i^t$ is bounded by:
+\begin{equation}
+  I(\theta^*;\, \Delta_i^t) \;\leq\; I(\theta^*;\, \cD_i).
+\end{equation}
+Even with \emph{infinite bandwidth} (no compression, no quantization),
+client~$i$'s contribution to the global model is limited by the information
+content of its local data about the global optimum.
+
+For a highly non-IID client (large $\sigma_i^2$), the local data contains
+limited information about $\theta^*$. No amount of communication bandwidth
+compensates --- the client needs more \emph{data}, not more \emph{bandwidth}.
+\end{corollary}
+
+\subsection{Communication-Adjusted Convergence}
+
+When clients communicate compressed updates $\hat{\Delta}_i^t$ instead of
+exact updates $\Delta_i^t$, a channel distortion term enters:
+\begin{equation}\label{eq:channel-loss}
+  L_{\text{channel}}^{(i)} := \E\bigl[\norm{\Delta_i^t - \hat{\Delta}_i^t}^2\bigr].
+\end{equation}
+
+\begin{theorem}[Communication-adjusted convergence]\label{thm:comm-conv}
+Under the conditions of \Cref{thm:ew-convergence}, with compressed
+communication satisfying $L_{\text{channel}}^{(i)} \leq \delta_i^2\norm{\Delta_i^t}^2$
+for compression ratio $\delta_i \in [0,1]$, EW-FedAvg converges at rate:
+\begin{equation}\label{eq:comm-conv}
+  \E[F(\theta^T)] - F^*
+  \;\leq\; \left(1 - \frac{\mu}{4L}\right)^T (F(\theta^0) - F^*)
+  + \frac{8L}{\mu^2}\left(
+    \frac{\sigma_{\text{sgd}}^2}{K\tau}
+    + \tau\,\frac{\HM(\sigma^2)}{\AM(\sigma^2)}\,\bar{\sigma}^2
+    + \sum_i \tilde{w}_i^2\,\delta_i^2\,\Delta_{\text{drift}}^{(i)}
+  \right).
+\end{equation}
+The third floor term decomposes via~\eqref{eq:drift-var} into a
+self-knowledge component ($\tau^2\eta^2\sigma_i^2$) and a stochastic
+component ($\tau\eta^2\sigma_{\text{sgd}}^2$), both modulated by the
+compression ratio~$\delta_i$ and the evidence weight~$\tilde{w}_i$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+The compressed update adds noise:
+$\hat{\Delta}_i^t = \Delta_i^t + \epsilon_i^t$ with
+$\E[\norm{\epsilon_i^t}^2] \leq \delta_i^2\norm{\Delta_i^t}^2$.
+This enters the descent lemma as an additional variance term:
+\[
+  \E\bigl[\norm{\textstyle\sum_i \tilde{w}_i \epsilon_i^t}^2\bigr]
+  = \sum_i \tilde{w}_i^2 \E[\norm{\epsilon_i^t}^2]
+  \leq \sum_i \tilde{w}_i^2 \delta_i^2 \Delta_{\text{drift}}^{(i)}.
+\]
+Combining with the EW-FedAvg analysis of \Cref{thm:ew-convergence}
+gives~\eqref{eq:comm-conv}.
+\end{proof}
+
+\begin{remark}[Evidence-aware compression]
+\Cref{thm:comm-conv} suggests an optimal compression strategy: allocate
+more bandwidth to high-evidence clients (low $\sigma_i^2$, high $\tilde{w}_i$)
+since their updates carry more weight. Formally, to minimize the
+communication floor $\sum_i \tilde{w}_i^2 \delta_i^2 \Delta_{\text{drift}}^{(i)}$
+subject to a total bandwidth constraint $\sum_i R_i \leq R_{\text{total}}$,
+the optimal allocation is water-filling:
+\begin{equation}
+  R_i^* \;\propto\; \tilde{w}_i \sqrt{\Delta_{\text{drift}}^{(i)}}.
+\end{equation}
+High-evidence clients get more bandwidth; low-evidence clients (whose
+updates are downweighted anyway) can be aggressively compressed.
+\end{remark}
+
+\subsection{Sparsified Gradients and the Blessing of Dimensionality}
+
+The blessing of dimensionality from the $\Omega$-framework~\cite{blessing2026}
+applies directly to FL gradient communication. When the global model has
+$d$ parameters but the effective gradient at each client is $k$-sparse
+(concentrates on $k \ll d$ coordinates), compressed sensing guarantees
+apply:
+
+\begin{proposition}[Sparse gradient recovery]\label{prop:sparse-recovery}
+If client~$i$'s true gradient $\nabla F_i(\theta)$ is $k_i$-sparse (has
+at most $k_i$ non-negligible coordinates), then top-$k_i$ sparsification
+achieves:
+\begin{equation}\label{eq:sparse-rate}
+  L_{\text{channel}}^{(i)} \;\leq\; \frac{\sigma_{\text{sgd}}^2}{n_i}
+    \cdot \frac{k_i \log(d/k_i)}{d},
+\end{equation}
+requiring only $O(k_i \log(d/k_i))$ communicated coordinates instead of $d$.
+\end{proposition}
+
+The key insight: non-IID clients tend to have \emph{sparser} gradients.
+A client whose data covers only a narrow slice of the input space has
+gradients concentrated on the model parameters relevant to that slice.
+This means the clients that need the most compression (high $\sigma_i^2$,
+heavily non-IID) are also the most compressible.
+
+\begin{corollary}[Sparsity--heterogeneity duality]
+Gradient sparsity $k_i$ and evidence variance $\sigma_i^2$ are positively
+correlated across clients: $k_i = O(1/\sigma_i^2)$ when heterogeneity
+is driven by data support mismatch. The evidence weight $w_i$ thus
+simultaneously controls aggregation quality and compression efficiency.
+\end{corollary}
+
+
+%% ========================================================================
+\section{Client Selection as Coalition Formation}
+\label{sec:coalition}
+%% ========================================================================
+
+\subsection{Coalition Rationality in FL}
+
+In the $\Omega$-framework, coalition~$S$ is rational if its members
+collectively outperform their sum of individual values. In FL, the
+analogous question is: which subset $S_t$ of clients should the server
+select at round~$t$?
+
+\begin{definition}[Marginal contribution of client $i$]\label{def:marginal}
+The marginal contribution of client~$i$ to coalition $S_t$ is:
+\begin{equation}\label{eq:marginal}
+  \Delta V_i(S_t) := \E[F(\theta_{S_t}^{t+1})] - \E[F(\theta_{S_t \setminus \{i\}}^{t+1})],
+\end{equation}
+where $\theta_S^{t+1}$ denotes the model obtained by aggregating updates
+from clients in~$S$ only.
+\end{definition}
+
+\begin{definition}[Communication-adjusted contribution]\label{def:comm-adj}
+Accounting for communication cost $c_i$ (bandwidth, latency, compute),
+client~$i$ should be included in $S_t$ iff:
+\begin{equation}\label{eq:rational-inclusion}
+  |\Delta V_i(S_t)| > c_i.
+\end{equation}
+\end{definition}
+
+\subsection{Evidence-Weighted Selection}
+
+\begin{theorem}[Evidence weight as selection criterion]\label{thm:selection}
+Under $L$-smoothness and the conditions of \Cref{thm:ew-variance}, the
+marginal contribution of client~$i$ satisfies:
+\begin{equation}\label{eq:marginal-bound}
+  |\Delta V_i(S_t)| \;\leq\; \frac{L\eta\tau}{W^2}\,w_i
+  \left(\norm{\nabla F(\theta^t)}^2 + \sigma_i^2\right),
+\end{equation}
+where $W = \sum_{j \in S_t} w_j$. The contribution is proportional to
+the evidence weight~$w_i$: low-evidence clients (high $\sigma_i^2$, low
+$w_i$) contribute less to the aggregate and are naturally deprioritized.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+The EW-FedAvg aggregated update with client~$i$ included vs.\ excluded
+differs by the weighted increment $(\tilde{w}_i / W) \Delta_i^t$. By
+$L$-smoothness:
+\[
+  |F(\theta_{S_t}^{t+1}) - F(\theta_{S_t \setminus i}^{t+1})|
+  \leq L\norm{\theta_{S_t}^{t+1} - \theta_{S_t \setminus i}^{t+1}}
+  = L \cdot \frac{w_i}{W} \norm{\Delta_i^t}.
+\]
+Bounding $\E[\norm{\Delta_i^t}] \leq \eta\tau(\norm{\nabla F(\theta^t)} + \sigma_i)$
+and collecting terms gives~\eqref{eq:marginal-bound}.
+\end{proof}
+
+\begin{corollary}[Automatic client filtering]\label{cor:auto-filter}
+Evidence weighting provides a soft client selection mechanism without
+explicit selection: even if all $K$ clients participate, the evidence
+weights $\tilde{w}_i = w_i / W$ automatically suppress the contribution
+of low-quality clients. This is strictly better than hard selection
+(which discards information) while achieving the same robustness.
+\end{corollary}
+
+\subsection{Cluster-Based Coalitions}
+
+When clients can be grouped into clusters $\cC_1, \ldots, \cC_M$ with
+similar distributions ($\sigma_i^2 \approx \sigma_j^2$ for $i, j$ in the
+same cluster), a two-level aggregation emerges naturally:
+
+\begin{enumerate}[(i)]
+  \item \textbf{Intra-cluster}: average within each cluster (clients are
+    approximately IID within a cluster, so uniform weighting is near-optimal).
+  \item \textbf{Inter-cluster}: aggregate cluster-level updates using
+    evidence weights $w_m = \sigma_{\min}^2 / \bar{\sigma}_m^2$, where
+    $\bar{\sigma}_m^2$ is cluster~$m$'s average variance.
+\end{enumerate}
+
+This corresponds precisely to the hierarchical coalition structure in
+the $\Omega$-framework: intra-cluster cooperation (local coalitions)
+followed by inter-cluster weighted aggregation (global coalition).
+
+
+%% ========================================================================
+\section{Non-IID Robustness}
+\label{sec:noniid}
+%% ========================================================================
+
+\subsection{The Non-IID Problem}
+
+The central challenge in FL is data heterogeneity. When $P_i \neq P_j$,
+the local objectives $F_i$ have different optima $\theta_i^* \neq \theta_j^*$,
+and local SGD steps drive clients away from the global optimum~$\theta^*$.
+This ``client drift'' is the dominant source of convergence degradation.
+
+Existing approaches address this through:
+\begin{itemize}
+  \item \textbf{SCAFFOLD}~\cite{karimireddy2020}: control variates
+    $c_i$ that correct for the difference $\nabla F_i - \nabla F$ at each
+    client.
+  \item \textbf{FedProx}~\cite{li2020fedprox}: a proximal regularizer
+    $(\mu_{\text{prox}}/2)\norm{\theta - \theta^t}^2$ added to each local
+    objective, penalizing drift from the global model.
+\end{itemize}
+
+\subsection{Evidence Weighting as Unified Robustness Mechanism}
+
+\begin{proposition}[EW-FedAvg subsumes FedProx's effect]\label{prop:fedprox}
+FedProx's proximal term reduces client drift:
+$\Delta_{\text{drift}}^{(i),\text{FedProx}} \leq \Delta_{\text{drift}}^{(i)} / (1 + \mu_{\text{prox}}/L)^2$.
+EW-FedAvg achieves an analogous effect through aggregation: the contribution
+of drifted clients to the global update is suppressed by $w_i = \sigma_{\min}^2/\sigma_i^2$.
+
+Formally, the effective drift contribution under EW-FedAvg is:
+\begin{equation}\label{eq:ew-vs-fedprox}
+  \sum_i \tilde{w}_i \,\Delta_{\text{drift}}^{(i)}
+  \;\leq\; \frac{\HM(\sigma^2)}{\AM(\sigma^2)} \cdot \bar{\Delta}_{\text{drift}},
+\end{equation}
+where $\bar{\Delta}_{\text{drift}} = \sum_i (1/K)\,\Delta_{\text{drift}}^{(i)}$.
+\end{proposition}
+
+\begin{proof}
+Since $\Delta_{\text{drift}}^{(i)} \leq C\,\sigma_i^2$ for some constant
+$C$ depending on $\eta, \tau$ (\Cref{prop:drift-bound}):
+\begin{equation}
+  \sum_i \tilde{w}_i\,\Delta_{\text{drift}}^{(i)}
+  \leq C \sum_i \tilde{w}_i\,\sigma_i^2
+  = C \sum_i \frac{w_i}{W}\,\sigma_i^2
+  = C \sum_i \frac{\sigma_{\min}^2}{W}
+  = \frac{CK\sigma_{\min}^2}{W}
+  = \frac{C \cdot \HM(\sigma^2)}{1}.
+\end{equation}
+Meanwhile, $\bar{\Delta}_{\text{drift}} \leq C \cdot \AM(\sigma^2)$,
+giving the ratio~\eqref{eq:ew-vs-fedprox}.
+\end{proof}
+
+\begin{proposition}[EW-FedAvg complements SCAFFOLD]\label{prop:scaffold}
+SCAFFOLD's control variates correct the bias: $\E[g_i - c_i] = \nabla F(\theta)$.
+This reduces $\sigma_i^2$ to the residual variance after control-variate
+correction:
+\begin{equation}
+  \sigma_i^{2,\text{SCAFFOLD}} = \E\bigl[\norm{g_i - c_i - \nabla F(\theta)}^2\bigr]
+  \;\leq\; \sigma_{\text{sgd}}^2.
+\end{equation}
+When $\sigma_i^{2,\text{SCAFFOLD}} \approx \sigma_{\text{sgd}}^2$ for all
+clients, evidence weights become approximately uniform: $w_i \approx 1$.
+EW-FedAvg gracefully reduces to standard averaging when heterogeneity is
+already controlled. The two mechanisms are complementary:
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Mechanism} & \textbf{Target} & \textbf{Action} \\
+\midrule
+SCAFFOLD & Bias $\E[g_i] \neq \nabla F$ & Corrects via control variate \\
+EW-FedAvg & Variance $\text{Var}(g_i)$ heterogeneity & Reweights via $w_i$ \\
+FedProx & Client drift $\norm{\theta_i - \theta}$ & Penalizes via regularizer \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{proposition}
+
+\subsection{Convergence Under Arbitrary Heterogeneity}
+
+\begin{theorem}[Heterogeneity-adaptive convergence]\label{thm:noniid-conv}
+Under the conditions of \Cref{thm:ew-convergence}, EW-FedAvg achieves:
+\begin{equation}
+  \E[F(\theta^T)] - F^* \;\leq\;
+  \left(1 - \frac{\mu}{4L}\right)^T (F(\theta^0) - F^*)
+  + \frac{8L\tau}{\mu^2}\,\frac{K}{\sum_{i=1}^K 1/\sigma_i^2}
+  + \frac{8L}{\mu^2} \cdot \frac{\sigma_{\text{sgd}}^2}{K\tau}.
+\end{equation}
+In the homogeneous limit ($\sigma_i^2 = \sigma^2$ for all~$i$), this
+recovers FedAvg's rate with floor $8L\tau\sigma^2/\mu^2$. In the
+heterogeneous regime, the floor is determined by the \emph{harmonic mean}
+of the variances --- dominated by the best clients rather than the worst.
+\end{theorem}
+
+\begin{remark}[Comparison with existing bounds]
+FedAvg's convergence floor scales with $\AM(\sigma^2)$ --- the worst clients
+dominate. FedProx scales with $\AM(\sigma^2)/(1 + \mu_{\text{prox}}/L)^2$
+--- reduced but still dominated by worst clients. EW-FedAvg scales with
+$\HM(\sigma^2)$ --- dominated by the \emph{best} clients. This is the
+fundamental advantage: evidence weighting leverages information quality
+differences rather than suffering from them.
+\end{remark}
+
+
+%% ========================================================================
+\section{The Full Algorithm}
+\label{sec:full-algorithm}
+%% ========================================================================
+
+Combining all components --- evidence-weighted aggregation, communication
+efficiency, and adaptive client selection --- we obtain the full
+Evidence-Weighted Federated Averaging algorithm.
+
+\begin{algorithm}[H]
+\caption{Full EW-FedAvg with Adaptive Selection and Compression}
+\label{alg:full-ew-fedavg}
+\SetAlgoLined
+\KwIn{Initial model $\theta^0$, $K$ clients with datasets $\{\cD_i\}$,
+  local epochs $\tau$, step size $\eta$, rounds $T$,
+  bandwidth budget $R_{\text{total}}$, cost threshold $c_{\min}$}
+\KwOut{Trained global model $\theta^T$}
+
+\BlankLine
+\tcp{Phase 0: Variance estimation (run periodically)}
+\For{$i = 1, \ldots, K$}{
+  Compute $\hat{\sigma}_i^2$ from pilot gradients at $\theta^0$\;
+}
+$\hat{\sigma}_{\min}^2 \gets \min_i \hat{\sigma}_i^2$\;
+$w_i \gets \hat{\sigma}_{\min}^2 / \hat{\sigma}_i^2$ for each $i$\;
+
+\BlankLine
+\For{$t = 0, 1, \ldots, T-1$}{
+
+  \BlankLine
+  \tcp{Step 1: Client selection (coalition formation)}
+  $S_t \gets \{i : w_i > c_{\min}\}$ \tcp*{exclude low-evidence clients}
+  $W \gets \sum_{i \in S_t} w_i$\;
+  $\tilde{w}_i \gets w_i / W$ for each $i \in S_t$\;
+  Broadcast $\theta^t$ to all $i \in S_t$\;
+
+  \BlankLine
+  \tcp{Step 2: Local training}
+  \For(\tcp*[f]{in parallel}){each $i \in S_t$}{
+    $\theta_i \gets \theta^t$\;
+    \For{$k = 0, \ldots, \tau - 1$}{
+      Sample mini-batch $\xi \sim \cD_i$\;
+      $\theta_i \gets \theta_i - \eta\,\nabla F_i(\theta_i; \xi)$\;
+    }
+    $\Delta_i^t \gets \theta_i - \theta^t$\;
+  }
+
+  \BlankLine
+  \tcp{Step 3: Evidence-aware compression}
+  \For{each $i \in S_t$}{
+    Allocate bandwidth $R_i \propto \tilde{w}_i \norm{\Delta_i^t}$\;
+    $k_i \gets \lfloor d \cdot R_i / R_{\text{total}} \rfloor$ \tcp*{coordinates to send}
+    $\hat{\Delta}_i^t \gets \textsc{TopK}(\Delta_i^t, k_i)$ \tcp*{sparsification}
+  }
+
+  \BlankLine
+  \tcp{Step 4: Evidence-weighted aggregation}
+  $\theta^{t+1} \gets \theta^t + \sum_{i \in S_t} \tilde{w}_i\,\hat{\Delta}_i^t$\;
+
+  \BlankLine
+  \tcp{Step 5: Periodic variance re-estimation}
+  \If{$t \bmod T_{\text{re-est}} = 0$}{
+    Update $\hat{\sigma}_i^2$ from recent gradient statistics\;
+    Recompute $w_i, \tilde{w}_i$\;
+  }
+}
+\Return{$\theta^T$}\;
+\end{algorithm}
+
+
+%% ========================================================================
+\section{Discussion}
+\label{sec:discussion}
+%% ========================================================================
+
+\subsection{Variance Estimation in Practice}
+
+The evidence weights $w_i = \sigma_{\min}^2 / \sigma_i^2$ require estimates
+of client-level gradient variance. Two practical approaches:
+\begin{enumerate}[(i)]
+  \item \textbf{Pilot phase}: at initialization, each client computes
+    multiple gradient estimates at the same $\theta^0$ and reports the
+    empirical variance to the server. Cost: $O(M)$ extra gradient
+    computations per client, where $M$ is the number of pilot samples.
+  \item \textbf{Online estimation}: the server tracks the running variance
+    of each client's updates $\Delta_i^t$ across rounds. After an initial
+    burn-in period, these estimates stabilize and can be used for weighting.
+    This requires no extra computation.
+\end{enumerate}
+
+Both approaches preserve privacy: the server only sees gradient statistics,
+not raw data.
+
+\subsection{Connections to the $\Omega$-Framework}
+
+The FL application demonstrates the generality of the $\Omega$-framework's
+core principles:
+\begin{enumerate}[(1)]
+  \item \textbf{Evidence weighting} ($w_i = V_{\min}/V_i$): the same
+    weighting scheme improves convergence in both multi-agent RL and FL.
+    The $\HM/\AM$ improvement factor is a universal consequence of optimal
+    inverse-variance weighting.
+  \item \textbf{Self-knowledge bottleneck}: the insight that ``you cannot
+    communicate what you do not know'' applies equally to RL agents
+    communicating policies and FL clients communicating gradients.
+    Bandwidth cannot substitute for data quality.
+  \item \textbf{Coalition formation}: client selection in FL is structurally
+    identical to coalition formation in cooperative games. The evidence
+    weight serves as the natural inclusion criterion in both settings.
+  \item \textbf{Blessing of dimensionality}: sparsified gradient communication
+    exploits the same concentration phenomena that make high-dimensional
+    policy gradient tractable.
+\end{enumerate}
+
+\subsection{Limitations}
+
+\begin{enumerate}[(i)]
+  \item \textbf{Variance estimation overhead}: the pilot phase adds
+    communication rounds. Online estimation introduces a burn-in period
+    during which weights may be inaccurate.
+  \item \textbf{Non-stationarity}: client data distributions may shift over
+    time, requiring periodic re-estimation of $\sigma_i^2$.
+  \item \textbf{Privacy}: reporting $\hat{\sigma}_i^2$ leaks information
+    about local data heterogeneity. Differential privacy mechanisms can
+    be applied to the variance estimates at the cost of noisier weights.
+  \item \textbf{The evidence weight is not the only factor}: in practice,
+    client reliability (uptime, network quality) and fairness considerations
+    may override pure evidence-weighted selection.
+\end{enumerate}
+
+
+%% ========================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+%% ========================================================================
+
+We have shown that the $\Omega$-framework's evidence-weighted multi-agent
+policy gradient transfers precisely to federated learning. The core
+mechanism --- inverse-variance weighting via $w_i = V_{\min}/V_i$ ---
+produces a $\HM(V)/\AM(V)$ variance improvement that is maximally
+beneficial precisely when data heterogeneity is worst. The self-knowledge
+bottleneck explains why bandwidth upgrades cannot fix the non-IID problem:
+clients with poor local data have fundamentally limited information about
+the global optimum, regardless of communication capacity. Evidence-weighted
+client selection provides a principled, automatic alternative to ad hoc
+selection heuristics.
+
+The FL application validates the $\Omega$-framework's claim to generality:
+its components (evidence weighting, lossy communication, coalition
+formation, blessing of dimensionality) are not artifacts of the multi-agent
+RL setting but universal principles of distributed learning under
+heterogeneous information quality.
+
+
+%% ========================================================================
+\bibliographystyle{plain}
+\begin{thebibliography}{10}
+
+\bibitem{mcmahan2017}
+B.~McMahan, E.~Moore, D.~Ramage, S.~Hampson, and B.~A.~y~Arcas.
+\newblock Communication-efficient learning of deep networks from decentralized
+  data.
+\newblock In \emph{Proceedings of AISTATS}, 2017.
+
+\bibitem{karimireddy2020}
+S.~P.~Karimireddy, S.~Kale, M.~Mohri, S.~Reddi, S.~Stich, and A.~T.~Suresh.
+\newblock {SCAFFOLD}: Stochastic controlled averaging for federated learning.
+\newblock In \emph{Proceedings of ICML}, 2020.
+
+\bibitem{li2020fedprox}
+T.~Li, A.~K.~Sahu, M.~Zaheer, M.~Sanjabi, A.~Talwalkar, and V.~Smith.
+\newblock Federated optimization in heterogeneous networks.
+\newblock In \emph{Proceedings of MLSys}, 2020.
+
+\bibitem{giannou2022}
+A.~Giannou, K.~Lotidis, P.~Mertikopoulos, and
+  P.~Vlatakis-Gkaragkounis.
+\newblock On the convergence of policy gradient methods to {N}ash equilibria in
+  general stochastic games.
+\newblock \emph{arXiv:2210.08857}, 2022.
+
+\bibitem{ewpg2026}
+E.~Shcherbinin.
+\newblock Evidence-weighted policy gradient convergence in general stochastic
+  games.
+\newblock Working paper, 2026.
+
+\bibitem{blessing2026}
+E.~Shcherbinin.
+\newblock The blessing of dimensionality for policy gradients: sparse recovery,
+  evidence weighting, and the logarithmic cost of action space expansion.
+\newblock Working paper, 2026.
+
+\bibitem{cooperative2026}
+E.~Shcherbinin.
+\newblock Cooperative policy gradient with lossy communication in general
+  stochastic games.
+\newblock Working paper, 2026.
+
+\bibitem{rothchild2020}
+D.~Rothchild, A.~Panda, E.~Ullah, N.~Ivkin, I.~Stoica,
+  V.~Braverman, J.~Gonzalez, and R.~Arber.
+\newblock {FetchSGD}: Communication-efficient federated learning with
+  sketching.
+\newblock In \emph{Proceedings of ICML}, 2020.
+
+\bibitem{li2019convergence}
+X.~Li, K.~Huang, W.~Yang, S.~Wang, and Z.~Zhang.
+\newblock On the convergence of {FedAvg} on non-{IID} data.
+\newblock In \emph{Proceedings of ICLR}, 2020.
+
+\end{thebibliography}
+
+\end{document}

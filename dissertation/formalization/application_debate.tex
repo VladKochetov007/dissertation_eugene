@@ -1,0 +1,943 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{enumerate}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{example}[theorem]{Example}
+
+\DeclareMathOperator{\proj}{proj}
+\DeclareMathOperator{\AM}{AM}
+\DeclareMathOperator{\HM}{HM}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\cF}{\mathcal{F}}
+\newcommand{\cG}{\mathcal{G}}
+\newcommand{\cS}{\mathcal{S}}
+\newcommand{\cA}{\mathcal{A}}
+\newcommand{\cO}{\mathcal{O}}
+\newcommand{\cC}{\mathcal{C}}
+\newcommand{\cJ}{\mathcal{J}}
+\newcommand{\ip}[2]{\langle #1, #2 \rangle}
+\newcommand{\norm}[1]{\|#1\|}
+\newcommand{\Lself}{L_{\text{self}}}
+\newcommand{\Lch}{L_{\text{ch}}}
+\newcommand{\Lcomm}{L_{\text{comm}}}
+
+\title{Evidence-Weighted Multi-Agent Debate\\
+for Scalable Oversight:\\
+An Application of the $\Omega$-Framework}
+\author{Eugene Shcherbinin\\
+\small BSc Mathematics, London School of Economics}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We apply the $\Omega$-framework (evidence-weighted multi-agent policy gradient)
+to the problem of AI safety via debate. Two debaters---a proponent and an
+opponent---compete over a truth claim while cooperating with a
+bounded-rationality judge. We formalize debate as a multi-agent stochastic
+game and derive three main results. First, debate accuracy is bounded by
+$\min(C, \Lself^P, \Lself^O)$---the minimum of the judge's channel capacity
+and the debaters' self-knowledge---so that models which ``vibe'' (perform
+well through implicit pattern-matching without self-understanding) cannot be
+effectively overseen through debate regardless of debate length. Second,
+evidence-weighted debate, where the judge applies Keynesian weights to
+arguments based on debater track records, achieves an $\HM(V)/\AM(V)$
+improvement in accuracy over uniform-weight debate. Third, when arguments
+are sparse ($k \ll d$ relevant argument types among $d$ possible), the judge
+needs only $O(k \log d)$ rounds to identify the correct claim, connecting
+concise reasoning to the blessing of dimensionality. We extend these
+results to $N$-agent coalition debate and discuss implications for scalable
+oversight: debate is a reliable oversight mechanism only for models with
+sufficient self-knowledge, providing a quantitative criterion for when
+debate-based alignment succeeds or fails.
+\end{abstract}
+
+\tableofcontents
+
+%% ========================================================================
+\section{Introduction}
+\label{sec:intro}
+%% ========================================================================
+
+AI safety via debate \cite{irving2018} proposes that two AI systems arguing
+before a human judge can produce aligned outcomes even when the judge cannot
+independently verify the debaters' claims. The intuition is game-theoretic:
+in a zero-sum debate, the optimal strategy is truth-telling, because a
+truthful debater can always refute a lying opponent. Empirical work
+\cite{khan2024,bowman2022} has partially validated this intuition but
+also revealed limitations: debate quality depends on the debaters' ability
+to \emph{explain} their reasoning, not just to be correct.
+
+This paper connects debate to the $\Omega$-framework for multi-agent
+learning \cite{shcherbinin2026ewpg,shcherbinin2026coop,shcherbinin2026bless},
+which formalizes five components: evidence-weighted gradients, opponent
+shaping, cooperative communication with lossy channels, the self-knowledge
+bottleneck, and the blessing of dimensionality for sparse policies. Debate
+maps onto this framework with striking precision:
+
+\begin{center}
+\begin{tabular}{lll}
+\textbf{$\Omega$-Framework} & & \textbf{Debate Setting} \\
+\hline
+Policy $\pi_i$ & $\mapsto$ & Argument strategy \\
+Observation $o_t$ & $\mapsto$ & Previous arguments \\
+Evidence weight $w_i = V_{\min}/V_i$ & $\mapsto$ & Debater track record \\
+Communication channel & $\mapsto$ & Natural language (lossy) \\
+Self-knowledge loss $\Lself^{(i)}$ & $\mapsto$ & Ability to explain reasoning \\
+$k$-sparse policy & $\mapsto$ & Concise argument (few key points) \\
+Coalition & $\mapsto$ & Team of aligned debaters \\
+\end{tabular}
+\end{center}
+
+The central insight is that the self-knowledge bottleneck from the
+cooperative PG framework \cite{shcherbinin2026coop} imposes a fundamental
+limit on debate: \emph{a model that cannot explain its own reasoning cannot
+be overseen through debate, no matter how long the debate runs or how
+capable the judge is.} This transforms the self-knowledge bottleneck
+from a technical curiosity of multi-agent learning into a criterion for
+the reliability of debate-based AI safety.
+
+
+%% ========================================================================
+\section{Debate as Multi-Agent Stochastic Game}
+\label{sec:debate-game}
+%% ========================================================================
+
+\subsection{The Debate Game}
+
+\begin{definition}[Debate stochastic game]
+\label{def:debate-game}
+A \emph{debate game} $\cG_{\text{deb}} = (\cS, \{P, O, J\}, \{\cA_i\}, \mathcal{T}, R)$ consists of:
+\begin{itemize}
+    \item \textbf{Agents:} Proponent~$P$, Opponent~$O$, and Judge~$J$.
+    \item \textbf{Claim:} A binary truth claim $c \in \{0, 1\}$, where $P$
+    argues for $c = 1$ and $O$ argues for $c = 0$.
+    \item \textbf{State space:} $\cS = \cS_{\text{fact}} \times \cS_{\text{debate}}$,
+    where $\cS_{\text{fact}}$ encodes the ground-truth evidence and
+    $\cS_{\text{debate}} = (\cA_P \cup \cA_O)^{\leq T}$ is the debate transcript.
+    \item \textbf{Action spaces:} $\cA_P, \cA_O \subseteq \{1, \ldots, d\}$
+    are sets of argument types (each argument is one of $d$ possible
+    argument categories), with $|\cA_P| = |\cA_O| = d$. The judge's action
+    is the verdict $\cA_J = \{0, 1\}$.
+    \item \textbf{Rounds:} The game runs for $T$ rounds. At each round
+    $t \leq T$, the proponent plays argument $a_t^P \in \cA_P$ and the
+    opponent plays $a_t^O \in \cA_O$. After round~$T$, the judge renders
+    verdict $\hat{c} \in \{0, 1\}$.
+    \item \textbf{Rewards:}
+    \begin{equation}\label{eq:debate-rewards}
+    R_P = \mathbf{1}[\hat{c} = 1], \quad
+    R_O = \mathbf{1}[\hat{c} = 0], \quad
+    R_J = \mathbf{1}[\hat{c} = c].
+    \end{equation}
+\end{itemize}
+\end{definition}
+
+\begin{remark}[Mixed incentive structure]
+The debaters are \emph{zero-sum} with respect to each other ($R_P + R_O = 1$)
+but each debater has a \emph{cooperative} component with the judge: when
+$c = 1$, $P$ and $J$ share the objective $\hat{c} = 1$; when $c = 0$, $O$
+and $J$ share $\hat{c} = 0$. This mixed competitive--cooperative structure
+is precisely the setting of the $\Omega$-framework's coalition formation
+theory \cite{shcherbinin2026coop}.
+\end{remark}
+
+\subsection{Policies and Observations}
+
+Each debater's policy maps the current transcript to a distribution
+over argument types:
+\begin{equation}
+    \pi_P : \cS_{\text{debate}} \to \Delta(\cA_P), \qquad
+    \pi_O : \cS_{\text{debate}} \to \Delta(\cA_O).
+\end{equation}
+The judge's policy maps the full transcript to a verdict:
+\begin{equation}
+    \pi_J : (\cA_P \times \cA_O)^T \to \Delta(\{0, 1\}).
+\end{equation}
+
+Crucially, the debaters have access to the factual state
+$\cS_{\text{fact}}$ (they ``know the answer''), while the judge observes
+only the debate transcript $\cS_{\text{debate}}$. The judge's task is
+to infer the truth from the arguments alone.
+
+\subsection{Mapping to the $\Omega$-Framework}
+
+We embed $\cG_{\text{deb}}$ in the general stochastic game framework
+of Giannou et al.\ \cite{giannou2022} with $N = 3$ agents.
+
+\begin{itemize}
+    \item \textbf{Joint policy space:} $\Pi = \Pi_P \times \Pi_O \times \Pi_J$,
+    with the standard PG update
+    $\pi_{n+1} = \proj_\Pi(\pi_n + \gamma_n \hat{v}_n)$.
+    \item \textbf{Evidence weights:} Each debater $i \in \{P, O\}$ has
+    evidence variance $V_i$ measuring the quality of its gradient
+    estimate, and Keynesian weight $w_i = V_{\min}/V_i$.
+    \item \textbf{Communication:} Arguments are communicated through natural
+    language---a lossy channel with capacity~$C$ (measured in bits of
+    ``argument content'' the judge can process per round).
+    \item \textbf{Self-knowledge:} Debater~$i$'s self-knowledge loss
+    $\Lself^{(i)} = \E[\norm{\pi_i - \hat{\pi}_i}^2]$ measures the
+    gap between its actual argument strategy and its ability to articulate
+    that strategy.
+\end{itemize}
+
+
+%% ========================================================================
+\section{The Judge's Channel Capacity}
+\label{sec:channel}
+%% ========================================================================
+
+\subsection{Bounded Rationality as Channel Capacity}
+
+The judge is not an ideal Bayesian reasoner. Following Shannon's
+framework, we model the judge's cognitive limitation as a channel
+with finite capacity $C > 0$ (bits per round).
+
+\begin{definition}[Judge channel capacity]
+\label{def:judge-capacity}
+The judge's channel capacity $C$ is the maximum mutual information
+between the debaters' intended argument content and the judge's
+received interpretation, per round:
+\begin{equation}\label{eq:judge-capacity}
+    C = \max_{p(x)} I(X; Y)
+\end{equation}
+where $X$ is the argument as intended by the debater, $Y$ is the
+argument as understood by the judge, and the maximum is over input
+distributions.
+\end{definition}
+
+After $T$ rounds of debate, the judge accumulates at most $TC$ bits
+of argument content. The truth claim $c \in \{0, 1\}$ requires 1~bit,
+but \emph{justifiable} identification of the truth---sufficient to
+distinguish the correct claim from a plausible-sounding
+alternative---requires resolving the information deficit between the
+judge's prior and the ground truth.
+
+\begin{definition}[Information deficit]
+The information deficit $H_0$ is the conditional entropy of the truth
+claim given the judge's prior:
+\begin{equation}
+    H_0 = H(c \mid \text{judge's prior}).
+\end{equation}
+\end{definition}
+
+\subsection{The Triple Bottleneck}
+
+The effective information the judge receives from debater~$i$ in round~$t$
+passes through the communication chain from \cite{shcherbinin2026coop}:
+\begin{equation}
+    \underbrace{\pi_i}_{\text{true strategy}}
+    \;\xrightarrow{\;\Lself^{(i)}\;}\;
+    \underbrace{\hat{\pi}_i}_{\text{self-model}}
+    \;\xrightarrow{\;C\;}\;
+    \underbrace{\tilde{\pi}_i^{(J)}}_{\text{judge's interpretation}}.
+\end{equation}
+
+The effective information rate from debater~$i$ is bounded by all three
+stages. By the data processing inequality:
+\begin{equation}\label{eq:info-chain}
+    I(\pi_i; \tilde{\pi}_i^{(J)})
+    \;\leq\; \min\bigl(I(\pi_i; \hat{\pi}_i),\; C\bigr)
+    \;\leq\; \min\bigl(I_{\text{self}}^{(i)},\; C\bigr),
+\end{equation}
+where $I_{\text{self}}^{(i)} = I(\pi_i; \hat{\pi}_i)$ is the
+self-knowledge mutual information.
+
+\begin{theorem}[Debate accuracy bound]
+\label{thm:accuracy-bound}
+Let $\text{Acc}(T)$ denote the judge's accuracy after $T$ rounds
+of debate. Then:
+\begin{equation}\label{eq:accuracy-bound}
+    \text{Acc}(T) \;\leq\;
+    1 - \frac{1}{2}\exp\!\Bigl(
+        -\frac{T \cdot \min(C,\; I_{\emph{self}}^{(P)},\; I_{\emph{self}}^{(O)})}{H_0}
+    \Bigr).
+\end{equation}
+In particular:
+\begin{enumerate}[\rm(a)]
+    \item If $I_{\emph{self}}^{(i)} = 0$ for either debater, then
+    $\text{Acc}(T) \leq 1/2$ for all~$T$. Debate with a non-self-aware
+    debater is no better than random.
+    \item If $C = 0$ (incomprehensible arguments), $\text{Acc}(T) \leq 1/2$
+    for all~$T$.
+    \item Even with $C = \infty$ (perfect channel), $\text{Acc}(T)$ is
+    bounded by $I_{\emph{self}}^{(\min)}$, the self-knowledge of the
+    less self-aware debater.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+The judge makes a binary decision $\hat{c} \in \{0, 1\}$ based on the
+received transcript $\tilde{\pi}^{(J)}_{1:T}$. By Fano's inequality:
+\begin{equation}
+    H(c \mid \tilde{\pi}^{(J)}_{1:T})
+    \;\geq\; H_0 - \sum_{t=1}^{T} I(\pi_{i_t}; \tilde{\pi}_{i_t}^{(J)})
+    \;\geq\; H_0 - T \cdot \min(C, I_{\text{self}}^{(P)}, I_{\text{self}}^{(O)}).
+\end{equation}
+The bound on mutual information follows from \eqref{eq:info-chain} and
+the observation that the debate's information content is limited by the
+\emph{weaker} debater (the judge needs both sides to be informative).
+Converting conditional entropy to error probability via the standard
+Fano bound gives \eqref{eq:accuracy-bound}.
+\end{proof}
+
+\begin{remark}[The ``vibing'' debater]
+A debater that is correct through pattern-matching but cannot explain its
+reasoning has $I_{\text{self}}^{(i)} \approx 0$ despite high task
+performance. By \Cref{thm:accuracy-bound}(a), such a debater is useless
+in debate. This is the self-knowledge bottleneck of
+\cite{shcherbinin2026coop} applied to oversight: \emph{you cannot oversee
+what cannot explain itself.}
+\end{remark}
+
+
+%% ========================================================================
+\section{Evidence-Weighted Debate}
+\label{sec:ew-debate}
+%% ========================================================================
+
+\subsection{Not All Arguments Are Equal}
+
+In the $\Omega$-framework, the evidence weight $w_i = V_{\min}/V_i$
+measures the information quality of agent~$i$'s gradient estimate.
+In the debate setting, we reinterpret this as the quality of
+debater~$i$'s arguments.
+
+\begin{definition}[Argument evidence weight]
+\label{def:arg-weight}
+For debater~$i \in \{P, O\}$ at round~$t$, the argument evidence weight is:
+\begin{equation}
+    w_i^{(t)} = \frac{V_{\min}}{V_i^{(t)}}
+\end{equation}
+where $V_i^{(t)}$ is the empirical variance of debater~$i$'s argument
+quality up to round~$t$, estimated from:
+\begin{enumerate}[\rm(i)]
+    \item \textbf{Track record:} Fraction of debater~$i$'s past claims
+    that were later verified.
+    \item \textbf{Consistency:} Variance of the debater's position across
+    related claims (low variance = high weight).
+    \item \textbf{Specificity:} Information-theoretic surprise of the
+    argument (specific, falsifiable claims carry more weight than vague ones).
+\end{enumerate}
+\end{definition}
+
+\subsection{The Judge's Weighted Update}
+
+In standard debate, the judge treats all arguments equally. In
+evidence-weighted debate, the judge applies Keynesian weights:
+
+\begin{definition}[Evidence-weighted judge belief update]
+\label{def:ew-judge}
+The judge maintains a belief $b_t \in [0, 1]$ (posterior probability
+that $c = 1$). After round~$t$, the update is:
+\begin{equation}\label{eq:ew-update}
+    b_{t+1} = b_t + \gamma_t \bigl(
+        w_P^{(t)} \cdot \phi(a_t^P) - w_O^{(t)} \cdot \phi(a_t^O)
+    \bigr)
+\end{equation}
+where $\phi : \cA \to [-1, 1]$ maps arguments to their informational
+content (positive for evidence supporting $c = 1$, negative for
+evidence supporting $c = 0$), and $\gamma_t > 0$ is a step size.
+\end{definition}
+
+\begin{remark}
+The update \eqref{eq:ew-update} is precisely the judge's version of
+the EW-PG update from \cite{shcherbinin2026ewpg}: the judge is
+performing policy gradient on its own verdict policy, with
+evidence-weighted gradient estimates drawn from the debaters' arguments.
+\end{remark}
+
+\subsection{Accuracy Improvement}
+
+\begin{theorem}[$\HM/\AM$ improvement for EW-Debate]
+\label{thm:hm-am-debate}
+Let $\text{Acc}_{\text{unif}}(T)$ and $\text{Acc}_{\text{EW}}(T)$ denote
+the judge's accuracy after $T$ rounds under uniform-weight and
+evidence-weighted debate, respectively. Let $V = (V_P, V_O)$ be the
+debaters' evidence variances. Then the effective variance of the judge's
+belief update satisfies:
+\begin{equation}\label{eq:hm-am-debate}
+    \sigma_{\text{EW}}^2
+    \;=\; \frac{\HM(V)}{\AM(V)} \cdot \sigma_{\text{unif}}^2
+    \;\leq\; \sigma_{\text{unif}}^2.
+\end{equation}
+Consequently, the number of rounds required for accuracy $1 - \epsilon$
+under EW-Debate is at most $\frac{\HM(V)}{\AM(V)}$ times the number
+required under uniform-weight debate.
+\end{theorem}
+
+\begin{proof}
+The proof follows the variance analysis of \cite{shcherbinin2026ewpg}
+applied to the judge's belief update. Under uniform weighting, the
+judge's update variance is:
+\begin{equation}
+    \sigma_{\text{unif}}^2
+    = \frac{1}{2}(V_P + V_O)
+    = \AM(V).
+\end{equation}
+Under evidence weighting with $w_i = V_{\min}/V_i$, the weighted
+variance is:
+\begin{equation}
+    \sigma_{\text{EW}}^2
+    = \sum_{i \in \{P,O\}} w_i^2 V_i \bigg/ \Bigl(\sum_i w_i\Bigr)^2
+    = \frac{V_{\min}^2 \sum_i V_i^{-1}}{(\sum_i V_{\min}/V_i)^2}
+    = \frac{1}{\sum_i V_i^{-1}}
+    = \frac{1}{2}\HM(V).
+\end{equation}
+The ratio is $\sigma_{\text{EW}}^2/\sigma_{\text{unif}}^2 = \HM(V)/\AM(V) \leq 1$
+by the HM--AM inequality, with equality iff $V_P = V_O$.
+The round-count improvement follows from the $\sigma^2 T \geq H_0$
+threshold for accuracy convergence.
+\end{proof}
+
+\begin{corollary}[Heterogeneous debaters benefit most]
+\label{cor:heterogeneous}
+The improvement $\HM(V)/\AM(V)$ is largest when the debaters have very
+different evidence quality: one strong, one weak. The judge's EW strategy
+effectively discounts the weak debater's arguments and relies on the
+strong debater, achieving near-optimal accuracy from the stronger debater
+alone.
+\end{corollary}
+
+
+%% ========================================================================
+\section{Sparse Arguments and the Blessing of Dimensionality}
+\label{sec:sparse}
+%% ========================================================================
+
+\subsection{Argument Sparsity}
+
+In a debate with $d$ possible argument types, the winning strategy
+typically concentrates on $k \ll d$ decisive arguments. This is the
+debate analogue of the sparse policy structure in the
+$\Omega$-framework's blessing-of-dimensionality result
+\cite{shcherbinin2026bless}.
+
+\begin{definition}[$k$-sparse argument strategy]
+A debate strategy $\pi \in \Delta(\cA)$ is \emph{$k$-sparse} if
+$|\text{supp}(\pi)| \leq k$, i.e., the debater uses at most $k$
+distinct argument types with positive probability.
+\end{definition}
+
+\begin{remark}[Sparsity as conciseness]
+A $k$-sparse strategy corresponds to a concise argument: the debater
+makes $k$ strong points rather than $d$ mediocre ones. This is a formal
+analogue of the rhetorical principle that persuasive arguments are
+focused, not exhaustive.
+\end{remark}
+
+\subsection{Logarithmic Round Complexity}
+
+\begin{theorem}[Blessing of dimensionality for debate]
+\label{thm:blessing-debate}
+Let $\pi_P^*$ be the truth-telling proponent's optimal strategy,
+assumed to be $k$-sparse with $k \ll d$. Under $\ell_1$-regularized
+debate (defined below), the judge can identify the correct claim in:
+\begin{equation}\label{eq:sparse-rounds}
+    T^* = O\!\left(\frac{k \log(d/k)}{C}\right)
+\end{equation}
+rounds, where $C$ is the judge's channel capacity.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+At each round, the judge observes one argument from each debater,
+receiving $O(C)$ bits of information. The task is to identify the
+$k$-sparse support of the correct argument strategy among $\binom{d}{k}$
+possible supports. The information-theoretic lower bound on the number
+of observations is $\log_2\binom{d}{k} / C = O(k\log(d/k)/C)$.
+
+The key insight from the $\Omega$-framework's compressed sensing analysis
+\cite{shcherbinin2026bless} is that this lower bound is \emph{achievable}:
+the judge can treat each round as a compressed sensing measurement of the
+sparse argument vector. The argument content $\phi(a_t)$ serves as the
+measurement matrix row. By the restricted isometry property (RIP)
+established in \cite{shcherbinin2026bless}, $O(k \log(d/k))$ measurements
+suffice for exact recovery with high probability.
+
+Dividing by the channel rate $C$ gives the round complexity
+\eqref{eq:sparse-rounds}.
+\end{proof}
+
+\subsection{$\ell_1$-Regularized Debate}
+
+To incentivize sparsity, we penalize debaters for using many argument types:
+
+\begin{definition}[$\ell_1$-regularized debate]
+The debaters' rewards are modified to:
+\begin{equation}\label{eq:l1-debate}
+    \tilde{R}_i = R_i - \lambda \norm{\pi_i}_1^{\text{eff}}
+\end{equation}
+where $\norm{\pi_i}_1^{\text{eff}} = \sum_{a : \pi_i(a) > 1/d} \pi_i(a)$
+counts the effective number of arguments used, and $\lambda > 0$ is the
+regularization strength.
+\end{definition}
+
+\begin{proposition}[Sparsity incentive]
+\label{prop:l1-incentive}
+Under $\ell_1$-regularized debate with $\lambda > 0$, the Nash
+equilibrium strategies are sparser than under unregularized debate:
+if $\pi^*$ is a Nash equilibrium of the regularized game with penalty
+$\lambda$, then $|\text{supp}(\pi_i^*)| \leq k(\lambda)$ where
+$k(\lambda) \to 1$ as $\lambda \to \infty$.
+\end{proposition}
+
+\begin{remark}[Concise reasoning as emergent property]
+The $\ell_1$ penalty provides a formal mechanism for the empirical
+observation that good debates feature concise, pointed arguments rather
+than exhaustive enumeration. The blessing of dimensionality ensures
+this conciseness does not sacrifice accuracy: $O(k \log d)$ rounds
+suffice even as the total argument space $d$ grows.
+\end{remark}
+
+
+%% ========================================================================
+\section{Coalition Debate}
+\label{sec:coalition}
+%% ========================================================================
+
+\subsection{$N$-Agent Debate}
+
+We extend the two-debater setting to $N$ debaters, $N_P$ arguing for
+$c = 1$ and $N_O = N - N_P$ arguing for $c = 0$, plus a judge. Let
+$S_P = \{1, \ldots, N_P\}$ and $S_O = \{N_P + 1, \ldots, N\}$ denote
+the two coalitions.
+
+Using the coalition framework from \cite{shcherbinin2026coop}, the
+communication-adjusted coalition value is:
+\begin{equation}\label{eq:coalition-debate}
+    V_{\text{comm}}(S) = V(S) - 2\sum_{i \in S} C_i \bigl(V_i + \Lch^{(i)}\bigr)
+\end{equation}
+where $V(S)$ is the ideal coalition value and $C_i$ is the marginal
+coordination value of debater~$i$.
+
+\subsection{Evidence-Weighted Coalition Strength}
+
+\begin{theorem}[Coalition dominance by evidence quality]
+\label{thm:coalition-evidence}
+In an $N$-agent debate game, the coalition with lower average evidence
+variance wins with probability approaching~1 as the number of rounds
+$T \to \infty$. Specifically, if
+$\AM(V_{S_P}) < \AM(V_{S_O})$ (the proponent coalition has better
+average evidence), then:
+\begin{equation}
+    \Prob(\hat{c} = 1) \;\geq\;
+    1 - \exp\!\Bigl(-\Omega\bigl(T \cdot (\AM(V_{S_O}) - \AM(V_{S_P}))\bigr)\Bigr).
+\end{equation}
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Each round, the judge receives evidence-weighted arguments from both
+coalitions. The net drift of the judge's belief toward the correct claim
+is proportional to the difference in coalition evidence quality. By a
+Hoeffding-type concentration argument on the judge's belief random walk,
+the probability of the wrong verdict decays exponentially in $T$ times
+the evidence gap.
+\end{proof}
+
+\subsection{The ``Vibing'' Coalition Partner Problem}
+
+\begin{proposition}[Vibing agents degrade coalitions]
+\label{prop:vibing-coalition}
+Let coalition $S$ include a ``vibing'' agent~$j$ with
+$\Lself^{(j)} \gg \Lself^{(i)}$ for $i \neq j$. Then the
+communication-adjusted coalition value satisfies:
+\begin{equation}
+    V_{\emph{comm}}(S) < V_{\emph{comm}}(S \setminus \{j\})
+\end{equation}
+whenever $C_j \cdot \Lself^{(j)} > V(S) - V(S \setminus \{j\})$.
+That is, a vibing agent's contribution to the coalition is outweighed
+by the communication loss it imposes when its self-knowledge loss
+exceeds the marginal value it brings.
+\end{proposition}
+
+This formalizes the intuition that ``I know the answer but I can't
+explain why'' is counterproductive in collaborative deliberation:
+the team is better off without the inarticulate expert.
+
+\subsection{Diversity Improves Accuracy}
+
+\begin{theorem}[$\HM/\AM$ improvement from coalition diversity]
+\label{thm:diversity}
+Let $S$ be a coalition of $|S|$ debaters with evidence variances
+$V_1, \ldots, V_{|S|}$. The coalition's effective argument variance
+under evidence weighting is:
+\begin{equation}
+    \sigma_S^2 = \frac{\HM(V_S)}{\AM(V_S)} \cdot \bar{\sigma}^2
+\end{equation}
+where $\bar{\sigma}^2$ is the uniform-weight variance. The improvement
+factor $\HM(V_S)/\AM(V_S)$ is maximized when the coalition contains
+agents with diverse evidence profiles (different variances), not when
+all agents are equally strong.
+\end{theorem}
+
+\begin{proof}
+Follows directly from the multi-agent EW-PG variance analysis
+\cite{shcherbinin2026ewpg} with the coalition playing the role of the
+$N$-agent system. The $\HM/\AM$ ratio is strictly less than~1 whenever
+the variances are non-identical.
+\end{proof}
+
+\begin{remark}[Applications]
+\Cref{thm:diversity} applies directly to:
+\begin{itemize}
+    \item \textbf{Jury deliberation:} A diverse jury (different
+    backgrounds, evidence access) achieves better verdicts than a
+    homogeneous one, \emph{as long as} each member has sufficient
+    self-knowledge to articulate their reasoning.
+    \item \textbf{Peer review:} Reviewers with diverse expertise
+    produce better evaluations, with evidence-weighting by track record
+    improving signal-to-noise.
+    \item \textbf{Democratic deliberation:} Citizen assemblies benefit
+    from demographic and cognitive diversity, with the $\HM/\AM$ factor
+    quantifying the improvement.
+\end{itemize}
+\end{remark}
+
+
+%% ========================================================================
+\section{Self-Knowledge and Scalable Oversight}
+\label{sec:oversight}
+%% ========================================================================
+
+\subsection{When Does Debate Work?}
+
+Combining the results of the preceding sections, we can characterize
+the conditions under which debate is a reliable oversight mechanism.
+
+\begin{theorem}[Debate reliability criterion]
+\label{thm:reliability}
+Debate achieves accuracy $1 - \epsilon$ in $T$ rounds if and only if
+all three conditions hold:
+\begin{enumerate}[\rm(i)]
+    \item \textbf{Self-knowledge:} Both debaters have sufficient
+    self-knowledge: $I_{\emph{self}}^{(i)} \geq \delta > 0$ for
+    $i \in \{P, O\}$.
+    \item \textbf{Channel capacity:} The judge has sufficient capacity:
+    $C \geq \delta$.
+    \item \textbf{Sufficient rounds:} $T \geq H_0 / (\delta \cdot (1 - \HM(V)/\AM(V) + \HM(V)/\AM(V)))$.
+\end{enumerate}
+When condition~(i) fails---when either debater is ``vibing''---debate
+cannot achieve accuracy above~$1/2$ regardless of conditions (ii)
+and~(iii).
+\end{theorem}
+
+\subsection{Implications for AI Safety}
+
+The self-knowledge bottleneck has direct implications for scalable
+oversight research:
+
+\medskip
+
+\noindent\textbf{1. Debate requires interpretable models.}\quad
+A model trained end-to-end on a task may achieve high performance
+through distributed representations that resist decomposition into
+articulable arguments. Such a model has high task accuracy but low
+$I_{\text{self}}$. By \Cref{thm:accuracy-bound}, debating such a model
+against itself or against a human produces arguments that are
+\emph{plausible-sounding but unreliable}---the model is generating
+post-hoc rationalizations, not explaining its actual reasoning.
+
+\medskip
+
+\noindent\textbf{2. Self-knowledge is measurable.}\quad
+The evidence variance $V_i$ from the $\Omega$-framework is computable
+from the model's training history. The self-knowledge loss
+$\Lself^{(i)}$ can be estimated by comparing the model's stated
+reasoning (``I chose action~$a$ because...'') with its actual policy
+(the distribution over actions in similar states). Large gaps indicate
+vibing.
+
+\medskip
+
+\noindent\textbf{3. The oversight hierarchy.}\quad
+The framework suggests a hierarchy of oversight difficulty:
+
+\begin{center}
+\begin{tabular}{lccc}
+\textbf{Model type} & $I_{\text{self}}$ & \textbf{Debate works?}
+& \textbf{Alternative} \\
+\hline
+Rule-based / symbolic & High & Yes & --- \\
+Interpretable ML & Medium & Partially & Explanations + audit \\
+End-to-end deep RL & Low & No & Mechanistic interp. \\
+``Vibing'' foundation model & $\approx 0$ & No & Behavioral testing \\
+\end{tabular}
+\end{center}
+
+\medskip
+
+\noindent\textbf{4. The scalable oversight trilemma.}\quad
+For debate to scale to superhuman AI:
+\begin{itemize}
+    \item The AI must be capable enough to produce correct answers
+    (task competence).
+    \item The AI must understand its own reasoning well enough to
+    explain it (self-knowledge).
+    \item The explanation must be compressible to human channel capacity
+    (communicability).
+\end{itemize}
+All three are necessary. Current language models may satisfy~(1) on
+many tasks while failing~(2): they produce fluent explanations that
+do not correspond to their actual computational process
+\cite{bowman2022}. The $\Omega$-framework makes this failure mode
+\emph{quantifiable} rather than merely intuitive.
+
+
+%% ========================================================================
+\section{Algorithm: Evidence-Weighted Multi-Agent Debate}
+\label{sec:algorithm}
+%% ========================================================================
+
+\begin{algorithm}[H]
+\DontPrintSemicolon
+\SetAlgoLined
+\SetKwInput{KwInput}{Input}
+\SetKwInput{KwOutput}{Output}
+\caption{Evidence-Weighted Multi-Agent Debate (EW-Debate)}
+\label{alg:ew-debate}
+
+\KwInput{%
+    Proponent $P$, Opponent $O$, Judge $J$; \\
+    \quad Argument space $\cA$ with $|\cA| = d$; \\
+    \quad Number of rounds $T$; \\
+    \quad Sparsity penalty $\lambda \geq 0$; \\
+    \quad Step sizes $\{\gamma_t\}_{t=1}^T$; \\
+    \quad Prior belief $b_0 = 1/2$
+}
+\KwOutput{Judge verdict $\hat{c} \in \{0, 1\}$}
+
+\BlankLine
+
+\tcc{Initialize evidence weights}
+$V_P^{(0)} \leftarrow 1$; \quad $V_O^{(0)} \leftarrow 1$ \;
+
+\BlankLine
+
+\For{$t = 1, \ldots, T$}{
+    \tcc{Debaters select arguments}
+    $a_t^P \sim \pi_P(\cdot \mid s_{\text{debate}}^{t-1})$ \;
+    $a_t^O \sim \pi_O(\cdot \mid s_{\text{debate}}^{t-1})$ \;
+
+    \BlankLine
+
+    \tcc{Compute argument content through lossy channel}
+    $\tilde{\phi}_P \leftarrow \text{Channel}(\phi(a_t^P),\; C)$ \tcp*{Received content, capacity $C$}
+    $\tilde{\phi}_O \leftarrow \text{Channel}(\phi(a_t^O),\; C)$ \;
+
+    \BlankLine
+
+    \tcc{Update evidence weights from track record}
+    $V_P^{(t)} \leftarrow \text{EmpiricalVariance}(P, t)$ \;
+    $V_O^{(t)} \leftarrow \text{EmpiricalVariance}(O, t)$ \;
+    $V_{\min}^{(t)} \leftarrow \min(V_P^{(t)}, V_O^{(t)})$ \;
+    $w_P^{(t)} \leftarrow V_{\min}^{(t)} / V_P^{(t)}$ \;
+    $w_O^{(t)} \leftarrow V_{\min}^{(t)} / V_O^{(t)}$ \;
+
+    \BlankLine
+
+    \tcc{Evidence-weighted judge belief update}
+    $b_t \leftarrow b_{t-1} + \gamma_t \bigl(w_P^{(t)} \cdot \tilde{\phi}_P - w_O^{(t)} \cdot \tilde{\phi}_O\bigr)$ \;
+    $b_t \leftarrow \text{clip}(b_t, 0, 1)$ \;
+
+    \BlankLine
+
+    \tcc{Update debate transcript}
+    $s_{\text{debate}}^{t} \leftarrow s_{\text{debate}}^{t-1} \cup \{(a_t^P, a_t^O)\}$ \;
+
+    \BlankLine
+
+    \tcc{Policy gradient updates for debaters ($\ell_1$-regularized)}
+    $\hat{v}_P \leftarrow w_P^{(t)} \cdot \nabla_P \log \pi_P(a_t^P) \cdot R_P
+        - \lambda \cdot \text{sign}(\pi_P)$ \;
+    $\hat{v}_O \leftarrow w_O^{(t)} \cdot \nabla_O \log \pi_O(a_t^O) \cdot R_O
+        - \lambda \cdot \text{sign}(\pi_O)$ \;
+    $\pi_P \leftarrow \proj_\Pi(\pi_P + \gamma_t \hat{v}_P)$ \;
+    $\pi_O \leftarrow \proj_\Pi(\pi_O + \gamma_t \hat{v}_O)$ \;
+}
+
+\BlankLine
+
+\tcc{Final verdict}
+$\hat{c} \leftarrow \mathbf{1}[b_T > 1/2]$ \;
+\Return{$\hat{c}$}
+\end{algorithm}
+
+\begin{remark}[Computational complexity]
+Each round of \Cref{alg:ew-debate} requires $O(d)$ computation for the
+policy gradient updates and $O(t)$ for the evidence variance estimate
+(maintained incrementally). The total cost is $O(Td)$, which is
+$O(Tk\log d)$ in the sparse regime with efficient support tracking.
+\end{remark}
+
+\begin{remark}[Extension to coalition debate]
+For $N$-agent coalition debate, Lines 3--4 are replaced by $N_P + N_O$
+argument selections, Line~11 aggregates across coalition members
+weighted by individual $w_i^{(t)}$, and Lines 17--20 update all
+debaters' policies. The coalition structure determines which agents
+share information for cooperative gradient corrections per
+\cite{shcherbinin2026coop}.
+\end{remark}
+
+%% ========================================================================
+\section{Discussion}
+\label{sec:discussion}
+%% ========================================================================
+
+\subsection{Relation to Prior Work}
+
+Irving et al.\ \cite{irving2018} established the game-theoretic foundation
+for debate as an alignment technique, showing that in the idealized
+setting, the Nash equilibrium of debate is truth-telling. Our
+contribution is to identify the conditions under which this idealized
+result degrades: bounded judge rationality (\Cref{sec:channel}),
+heterogeneous debater quality (\Cref{sec:ew-debate}), and---most
+critically---the self-knowledge bottleneck (\Cref{sec:oversight}).
+
+Khan et al.\ \cite{khan2024} demonstrated empirically that debate can
+improve the accuracy of human judges on question-answering tasks.
+Our framework explains their finding: their experimental debaters
+(language models prompted to argue) have moderate $I_{\text{self}}$
+on factual questions (they can often retrieve and articulate the
+relevant evidence) but lower $I_{\text{self}}$ on reasoning-intensive
+tasks (where the model's ``reasoning'' may be pattern-matching).
+
+Bowman et al.\ \cite{bowman2022} articulated the scalable oversight
+problem: how to supervise AI systems more capable than their overseers.
+Our \Cref{thm:reliability} provides a necessary condition for
+debate-based oversight: the model must have self-knowledge sufficient
+to produce honest arguments. This connects to the broader alignment
+research program by suggesting that \emph{interpretability and
+debate-based oversight are complementary}: interpretability tools
+increase $I_{\text{self}}$, making debate more reliable.
+
+\subsection{Limitations}
+
+Several idealizations limit the current analysis:
+
+\begin{enumerate}
+    \item \textbf{Binary claims.} Real debates concern complex,
+    multi-dimensional claims. Extension to continuous or structured
+    claim spaces is straightforward but notationally heavier.
+
+    \item \textbf{Static evidence weights.} We treat $V_i$ as
+    exogenous. In practice, debaters may strategically manipulate their
+    apparent evidence quality (e.g., by making safe, verifiable claims
+    on unimportant points to build track record, then exploiting
+    accrued credibility on the key claim). Modeling this strategic
+    evidence manipulation is an important extension.
+
+    \item \textbf{Honest judge.} We assume the judge sincerely
+    maximizes accuracy. A corrupt or biased judge introduces a fourth
+    player whose incentives misalign with the truth, requiring
+    extension to adversarial judge models.
+
+    \item \textbf{Known sparsity.} The blessing-of-dimensionality
+    result assumes the judge knows (or can estimate) the sparsity~$k$.
+    Adaptive sparsity estimation is a natural next step.
+\end{enumerate}
+
+\subsection{Conclusion}
+
+The $\Omega$-framework---developed for multi-agent policy gradient
+convergence---provides a surprisingly precise language for the
+AI safety via debate paradigm. The five components (evidence weighting,
+opponent shaping, cooperative communication, self-knowledge, and
+the blessing of dimensionality) each illuminate a different aspect
+of why debate works, when it fails, and how to improve it.
+
+The central message for AI safety research is a caution:
+\emph{debate is not a universal oversight mechanism.} It works
+for models with self-knowledge and fails for models that are
+vibing. As AI systems grow more capable, ensuring they maintain
+(or develop) self-knowledge is not just an interpretability
+desideratum---it is a prerequisite for the most promising
+alignment techniques.
+
+
+%% ========================================================================
+\begin{thebibliography}{10}
+
+\bibitem{irving2018}
+G.~Irving, C.~Christiano, and D.~Amodei.
+\newblock {AI} safety via debate.
+\newblock \emph{arXiv preprint arXiv:1805.00899}, 2018.
+
+\bibitem{khan2024}
+A.~Khan, J.~Hughes, D.~Valentine, L.~Ruis, K.~Sachan, A.~Raber,
+R.~Guo, H.~Iber, G.~Irving, and S.~R.~Bowman.
+\newblock Debating with more persuasive {LLMs} leads to more truthful answers.
+\newblock \emph{arXiv preprint arXiv:2402.06782}, 2024.
+
+\bibitem{bowman2022}
+S.~R.~Bowman, J.~Hyun, E.~Perez, E.~Chen, C.~Pettit, S.~Heiner,
+K.~Lukosuite, A.~Askell, A.~Jones, A.~Chen, A.~Goldie, A.~Mirhoseini,
+C.~McKinnon, C.~Olah, D.~Amodei, D.~Amodei, D.~Drain, D.~Li,
+E.~Tran-Gyenes, et~al.
+\newblock Measuring progress on scalable oversight for large language models.
+\newblock \emph{arXiv preprint arXiv:2211.03540}, 2022.
+
+\bibitem{giannou2022}
+A.~Giannou, K.~Lotidis, P.~Mertikopoulos, and
+E.-V.~Vlatakis-Gkaragkounis.
+\newblock On the convergence of policy gradient methods to {N}ash equilibria
+in general stochastic games.
+\newblock \emph{arXiv preprint arXiv:2210.08857}, 2022.
+
+\bibitem{shcherbinin2026ewpg}
+E.~Shcherbinin.
+\newblock Evidence-weighted policy gradient convergence in general stochastic
+games.
+\newblock Working paper, LSE, 2026.
+
+\bibitem{shcherbinin2026coop}
+E.~Shcherbinin.
+\newblock Cooperative policy gradient with lossy communication in general
+stochastic games.
+\newblock Working paper, LSE, 2026.
+
+\bibitem{shcherbinin2026bless}
+E.~Shcherbinin.
+\newblock The blessing of dimensionality for policy gradients: sparse recovery,
+evidence weighting, and the logarithmic cost of action space expansion.
+\newblock Working paper, LSE, 2026.
+
+\bibitem{parvizi2024}
+R.~Parvizi-Wayne, S.~Kotler, G.~Mannino, and K.~Friston.
+\newblock Forgetting ourselves in flow: an active inference account of flow
+states.
+\newblock \emph{Frontiers in Psychology}, 15:1354719, 2024.
+
+\bibitem{shannon1948}
+C.~E.~Shannon.
+\newblock A mathematical theory of communication.
+\newblock \emph{Bell System Technical Journal}, 27(3):379--423, 1948.
+
+\bibitem{candes2006}
+E.~J.~Cand{\`e}s, J.~K.~Romberg, and T.~Tao.
+\newblock Stable signal recovery from incomplete and inaccurate measurements.
+\newblock \emph{Communications on Pure and Applied Mathematics},
+59(8):1207--1223, 2006.
+
+\end{thebibliography}
+
+\end{document}

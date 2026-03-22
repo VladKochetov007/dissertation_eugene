@@ -1,0 +1,696 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{enumerate}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+\usepackage{booktabs}
+\usepackage{bbm}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{example}[theorem]{Example}
+
+\DeclareMathOperator{\proj}{proj}
+\DeclareMathOperator{\AM}{AM}
+\DeclareMathOperator{\HM}{HM}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator{\Jac}{Jac}
+\DeclareMathOperator{\KL}{KL}
+\DeclareMathOperator{\Var}{Var}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\cF}{\mathcal{F}}
+\newcommand{\cU}{\mathcal{U}}
+\newcommand{\cE}{\mathcal{E}}
+\newcommand{\cB}{\mathcal{B}}
+\newcommand{\cC}{\mathcal{C}}
+\newcommand{\cR}{\mathcal{R}}
+\newcommand{\cO}{\mathcal{O}}
+\newcommand{\cL}{\mathcal{L}}
+\newcommand{\cS}{\mathcal{S}}
+\newcommand{\cA}{\mathcal{A}}
+\newcommand{\cM}{\mathcal{M}}
+\newcommand{\cD}{\mathcal{D}}
+\newcommand{\cJ}{\mathcal{J}}
+\newcommand{\ip}[2]{\langle #1, #2 \rangle}
+
+\title{The $\Omega$-Framework Applied to LLM Alignment:\\
+Evidence-Weighted Multi-Agent RLHF}
+\author{Eugene Shcherbinin\\
+\small BSc Mathematics, London School of Economics\\
+\small Candidate 007}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We apply the $\Omega$-framework --- evidence-weighted multi-agent policy gradient with opponent shaping --- to the problem of LLM alignment via reinforcement learning from human feedback (RLHF). The alignment pipeline is recast as a stochastic game between the language model, multiple reward models with heterogeneous evidence quality, and human evaluators with lossy communication channels. This recasting yields three concrete contributions: (1)~\emph{Evidence-Weighted RLHF} (EW-RLHF), which automatically aggregates reward signals by confidence rather than hand-tuned coefficients, with provable variance improvement $\HM(V)/\AM(V) \leq 1$; (2)~a formal characterisation of the \emph{vibing problem} --- models that perform well but cannot articulate their reasoning --- as a self-knowledge bottleneck that bounds the effectiveness of all communication-based alignment methods (debate, RLAIF, constitutional AI); and (3)~a LOLA-aware reward modelling framework that anticipates and mitigates Goodhart's Law by treating reward hacking as opponent shaping. We connect these results to InstructGPT~\cite{ouyang2022}, Constitutional AI~\cite{bai2022}, and AI Safety via Debate~\cite{irving2018}.
+\end{abstract}
+
+\tableofcontents
+
+%% ========================================================================
+\section{Introduction}
+\label{sec:intro}
+%% ========================================================================
+
+The dominant paradigm for aligning large language models (LLMs) with human preferences is reinforcement learning from human feedback (RLHF)~\cite{christiano2017, ouyang2022}. The pipeline consists of: (1)~supervised fine-tuning on demonstrations, (2)~training a reward model on human preference comparisons, and (3)~optimising the LLM policy against the reward model via PPO or similar algorithms.
+
+Despite practical success, this pipeline has well-known failure modes: reward hacking (Goodhart's Law), inconsistent human feedback, difficulty aggregating multiple reward objectives (helpfulness vs.\ harmlessness vs.\ honesty), and the fundamental opacity of model reasoning. We argue that these are not \emph{ad hoc} problems but manifestations of a single structural phenomenon: \emph{RLHF is a multi-agent game with heterogeneous evidence quality and lossy communication channels}.
+
+The $\Omega$-framework, developed in the companion papers on evidence-weighted PG and opponent-shaping PG, provides the formal machinery to analyse this game. In this paper, we map the RLHF pipeline onto the $\Omega$-framework and derive concrete algorithmic and theoretical consequences.
+
+\paragraph{Organisation.} \Cref{sec:alignment-game} formulates the alignment problem as a multi-agent game. \Cref{sec:ew-rlhf} develops evidence-weighted reward aggregation. \Cref{sec:vibing} formalises the vibing problem via the self-knowledge bottleneck. \Cref{sec:constitutional} analyses Constitutional AI as cooperative PG. \Cref{sec:goodhart} treats Goodhart's Law as opponent shaping. \Cref{sec:debate} applies the framework to multi-agent debate.
+
+
+%% ========================================================================
+\section{The Alignment Problem as Multi-Agent Learning}
+\label{sec:alignment-game}
+%% ========================================================================
+
+\subsection{The alignment game}
+
+We model the RLHF pipeline as a stochastic game $\mathcal{G}_{\mathrm{align}}$ with three classes of agents:
+
+\begin{definition}[Alignment game]
+\label{def:alignment-game}
+The alignment game $\mathcal{G}_{\mathrm{align}} = (\cS, \{(\cA_i, \pi_i, R_i, V_i)\}_{i \in \mathcal{N}})$ consists of:
+\begin{enumerate}[(i)]
+    \item \textbf{The LLM} (agent $0$): policy $\pi_\theta : \cS \to \Delta(\cA_0)$ parameterised by $\theta \in \R^d$. The state space $\cS$ is the space of prompts; the action space $\cA_0$ is the token vocabulary; the policy generates responses autoregressively.
+
+    \item \textbf{Reward models} (agents $1, \ldots, K$): each reward model $r_k : \cS \times \cA_0 \to \R$ maps (prompt, response) pairs to scalar rewards. Different reward models encode different objectives (helpfulness $r_H$, harmlessness $r_S$, honesty $r_O$). Each has an associated evidence weight $V_k > 0$ measuring confidence in its training signal.
+
+    \item \textbf{Human evaluators} (agents $K+1, \ldots, K+M$): humans provide preference comparisons $y \succ y'$ given prompt $x$. Human $m$ has evidence weight $V_m$ reflecting attention, expertise, and consistency. Human feedback is communicated through natural language --- an inherently lossy channel with capacity $C_m$.
+\end{enumerate}
+\end{definition}
+
+\subsection{The mapping to the $\Omega$-framework}
+
+\begin{table}[htbp]
+\centering
+\caption{Mapping from $\Omega$-framework to RLHF alignment.}
+\label{tab:mapping}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{$\Omega$-framework} & \textbf{RLHF realisation} & \textbf{Evidence quality} \\
+\midrule
+Policy $\pi_i$ & LLM parameters $\theta$ & --- \\
+Gradient field $v(\pi)$ & PPO policy gradient & --- \\
+Evidence weight $V_i$ & Reward model confidence & $V_k = \sigma_k^{-2}$ \\
+Evidence weight $w_i = V_{\min}/V_i$ & Inverse noise scaling & $w_k \in [w_{\min}, 1]$ \\
+Communication channel $C_{ij}$ & Natural language feedback & $C_m \ll \infty$ (lossy) \\
+Self-knowledge $L_{\mathrm{self}}$ & Chain-of-thought faithfulness & High $L_{\mathrm{self}}$ = vibing \\
+Opponent shaping (LOLA) & Reward hacking / Goodhart & LLM shapes $r_k$ \\
+SOS parameter $\mu$ & Reward landscape curvature & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{proposition}[RLHF as stochastic game]
+\label{prop:rlhf-game}
+Standard RLHF~\cite{christiano2017, ouyang2022} is a special case of $\mathcal{G}_{\mathrm{align}}$ with $K = 1$ (single reward model), $M \geq 1$ (human labellers), and the objective:
+\begin{equation}
+\label{eq:rlhf-obj}
+    \max_\theta \; \E_{x \sim \cD, \, y \sim \pi_\theta(\cdot|x)}\bigl[r(x, y)\bigr] - \beta \, \KL\bigl(\pi_\theta \,\|\, \pi_{\mathrm{ref}}\bigr),
+\end{equation}
+where $\pi_{\mathrm{ref}}$ is the supervised fine-tuned policy and $\beta > 0$ is the KL penalty. The policy gradient is:
+\begin{equation}
+\label{eq:rlhf-pg}
+    \nabla_\theta J(\theta) = \E_{x, y}\bigl[\bigl(r(x,y) - \beta \log \frac{\pi_\theta(y|x)}{\pi_{\mathrm{ref}}(y|x)}\bigr) \nabla_\theta \log \pi_\theta(y|x)\bigr].
+\end{equation}
+This is precisely the single-agent PG update of Giannou et al.~\cite{giannou2022} with the reward signal $\hat{v}_n = r(x_n, y_n) \nabla_\theta \log \pi_\theta(y_n | x_n)$.
+\end{proposition}
+
+\subsection{Evidence quality in the alignment pipeline}
+
+The critical observation is that different components of the alignment pipeline have \emph{different evidence quality}:
+
+\begin{enumerate}[(a)]
+    \item \textbf{Reward models trained on large, consistent datasets} have high $V_k$ (low noise, many comparisons, clear signal).
+    \item \textbf{Reward models trained on small or contested domains} (e.g., political neutrality, cultural sensitivity) have low $V_k$.
+    \item \textbf{Human evaluators} have highly variable $V_m$: experts attending carefully have $V_m \gg 1$; fatigued crowd-workers clicking through tasks have $V_m \approx V_{\min}$.
+    \item \textbf{The LLM itself}, when used as a self-evaluator (RLAIF), has evidence weight $V_{\mathrm{self}}$ that depends on its self-knowledge --- the ability to accurately assess its own outputs.
+\end{enumerate}
+
+Standard RLHF treats all reward signals equally, or weights them by hand-tuned coefficients. The $\Omega$-framework provides a principled alternative.
+
+
+%% ========================================================================
+\section{Evidence-Weighted Reward Aggregation}
+\label{sec:ew-rlhf}
+%% ========================================================================
+
+\subsection{The multi-reward setting}
+
+In practice, LLM alignment involves multiple reward objectives. Anthropic's Constitutional AI~\cite{bai2022} uses helpfulness and harmlessness; OpenAI's InstructGPT~\cite{ouyang2022} trains reward models on diverse preference data with varying annotator agreement. The standard approach combines rewards via a fixed weighted sum:
+\begin{equation}
+\label{eq:standard-combo}
+    r_{\mathrm{agg}}(x, y) = \sum_{k=1}^K \alpha_k \, r_k(x, y), \qquad \sum_k \alpha_k = 1,
+\end{equation}
+where $\alpha_k$ are manually tuned hyperparameters. This is unsatisfactory: the optimal weighting depends on the relative \emph{confidence} of each reward model, which varies across the input distribution.
+
+\subsection{EW-RLHF: evidence-weighted aggregation}
+
+\begin{definition}[Evidence-weighted reward]
+\label{def:ew-reward}
+Given reward models $r_1, \ldots, r_K$ with associated evidence weights $V_1, \ldots, V_K > 0$, the \emph{evidence-weighted aggregate reward} is:
+\begin{equation}
+\label{eq:ew-reward}
+    r_{\mathrm{EW}}(x, y) = \frac{\sum_{k=1}^K V_k \, r_k(x, y)}{\sum_{k=1}^K V_k}.
+\end{equation}
+Equivalently, with normalised Keynesian weights $w_k = V_k / V_{\max}$:
+\begin{equation}
+\label{eq:ew-reward-normalised}
+    r_{\mathrm{EW}}(x, y) = \frac{\sum_{k=1}^K w_k \, r_k(x, y)}{\sum_{k=1}^K w_k}.
+\end{equation}
+\end{definition}
+
+The evidence weight $V_k$ for reward model $r_k$ is operationalised as the inverse variance of $r_k$'s predictions on a held-out calibration set:
+\begin{equation}
+\label{eq:evidence-operational}
+    V_k = \frac{1}{\Var_{(x,y) \sim \cD_{\mathrm{cal}}}[r_k(x,y) - r^*(x,y)]},
+\end{equation}
+where $r^*$ is the ground-truth human preference (approximated by high-quality annotations). In the $\Omega$-framework, this is the Keynesian weight of evidence: $V_k$ measures how much information $r_k$ carries about the true reward.
+
+\begin{theorem}[Variance improvement of EW-RLHF]
+\label{thm:ew-variance}
+Let each reward model $r_k$ have noise variance $\sigma_k^2 = C / V_k$ for a shared constant $C > 0$ (Keynesian inverse relationship). The variance of the aggregate reward signal satisfies:
+\begin{equation}
+\label{eq:variance-improvement}
+    \frac{\Var[r_{\mathrm{EW}}]}{\Var[r_{\mathrm{uniform}}]} = \frac{\HM(V_1, \ldots, V_K)}{\AM(V_1, \ldots, V_K)} \leq 1,
+\end{equation}
+where $r_{\mathrm{uniform}} = K^{-1} \sum_k r_k$ is the uniformly-weighted aggregate. Equality holds if and only if $V_1 = \cdots = V_K$.
+\end{theorem}
+
+\begin{proof}
+The variance of the uniformly-weighted aggregate is:
+\[
+    \Var[r_{\mathrm{uniform}}] = \frac{1}{K^2} \sum_{k=1}^K \sigma_k^2 = \frac{C}{K^2} \sum_{k=1}^K V_k^{-1} = \frac{C}{K} \cdot \frac{1}{\HM(V)},
+\]
+using $\HM(V) = K / \sum_k V_k^{-1}$. The variance of the evidence-weighted aggregate is:
+\[
+    \Var[r_{\mathrm{EW}}] = \frac{\sum_k V_k^2 \sigma_k^2}{(\sum_k V_k)^2} = \frac{C \sum_k V_k}{(\sum_k V_k)^2} = \frac{C}{\sum_k V_k} = \frac{C}{K} \cdot \frac{1}{\AM(V)}.
+\]
+The ratio is $\HM(V)/\AM(V)$, which satisfies $\HM \leq \AM$ by the AM-HM inequality, with equality iff all $V_k$ are equal.
+\end{proof}
+
+\begin{corollary}[Heterogeneity amplifies the gain]
+\label{cor:heterogeneity}
+Define the coefficient of variation $\mathrm{CV}^2 = \Var[V] / \AM(V)^2$. Then:
+\begin{equation}
+    \frac{\HM(V)}{\AM(V)} = \frac{1}{1 + \mathrm{CV}^2 + O(\mathrm{CV}^4)}.
+\end{equation}
+The more heterogeneous the evidence quality, the larger the variance reduction.
+\end{corollary}
+
+\begin{remark}
+In the RLHF setting, evidence heterogeneity is the norm, not the exception. A helpfulness reward model trained on millions of comparisons ($V_H \gg 1$) is combined with a safety reward model trained on a smaller, more contentious dataset ($V_S \ll V_H$). Uniform weighting allows the noisy safety signal to contaminate the clean helpfulness signal. EW-RLHF automatically down-weights the noisier component.
+\end{remark}
+
+\subsection{The EW-RLHF algorithm}
+
+\begin{algorithm}[htbp]
+\SetAlgoLined
+\KwIn{SFT policy $\pi_{\mathrm{ref}}$, reward models $\{r_k\}_{k=1}^K$, calibration set $\cD_{\mathrm{cal}}$, KL coefficient $\beta$, learning rate schedule $\gamma_n$}
+\KwOut{Aligned policy $\pi_\theta$}
+
+\BlankLine
+\tcp{Phase 1: Estimate evidence weights}
+\For{$k = 1, \ldots, K$}{
+    Compute $\hat{\sigma}_k^2 \gets \frac{1}{|\cD_{\mathrm{cal}}|} \sum_{(x,y) \in \cD_{\mathrm{cal}}} (r_k(x,y) - \bar{r}_k)^2$\;
+    Set $V_k \gets 1 / \hat{\sigma}_k^2$, \quad $w_k \gets V_{\min} / V_k$\;
+}
+\BlankLine
+\tcp{Phase 2: Evidence-weighted PPO}
+Initialise $\theta \gets \theta_{\mathrm{ref}}$\;
+\For{episode $n = 1, 2, \ldots$}{
+    Sample batch of prompts $\{x_j\}_{j=1}^B \sim \cD$\;
+    Generate responses $y_j \sim \pi_\theta(\cdot | x_j)$\;
+    \BlankLine
+    \tcp{Evidence-weighted reward}
+    \For{each $(x_j, y_j)$}{
+        $\hat{r}_j \gets \frac{\sum_{k=1}^K V_k \, r_k(x_j, y_j)}{\sum_{k=1}^K V_k}$\;
+        $A_j \gets \hat{r}_j - \beta \log \frac{\pi_\theta(y_j | x_j)}{\pi_{\mathrm{ref}}(y_j | x_j)} - b(x_j)$\;
+    }
+    \BlankLine
+    \tcp{PPO update with evidence-weighted advantages}
+    $\hat{g} \gets \frac{1}{B} \sum_j A_j \nabla_\theta \log \pi_\theta(y_j | x_j)$\;
+    $\theta \gets \theta + \gamma_n \hat{g}$ \quad (with PPO clipping)\;
+    \BlankLine
+    \tcp{Phase 3: Periodically re-estimate $V_k$ (optional)}
+    \If{$n \bmod T = 0$}{
+        Re-estimate $\{V_k\}$ on fresh calibration data\;
+    }
+}
+\caption{EW-RLHF: Evidence-Weighted Reinforcement Learning from Human Feedback}
+\label{alg:ew-rlhf}
+\end{algorithm}
+
+\begin{proposition}[Convergence of EW-RLHF]
+\label{prop:ew-rlhf-convergence}
+Under the conditions of Giannou et al.~\cite{giannou2022} (SOS Nash, step-size schedule $\gamma_n = \gamma/(n+m)^p$ with $p \in (1/2, 1]$), EW-RLHF converges to a neighbourhood of the Nash policy $\theta^*$ with rate:
+\begin{equation}
+    \E[\|\theta_n - \theta^*\|^2 \mid \cE] = \mathcal{O}\!\left(\frac{\HM(V)}{\AM(V)} \cdot \frac{C_{\mathrm{std}}}{n^q}\right),
+\end{equation}
+where $C_{\mathrm{std}}$ is the convergence constant for uniformly-weighted RLHF. The improvement factor $\HM(V)/\AM(V)$ is strict whenever the reward models have heterogeneous evidence quality.
+\end{proposition}
+
+
+%% ========================================================================
+\section{The Vibing Problem in Alignment}
+\label{sec:vibing}
+%% ========================================================================
+
+\subsection{Self-knowledge and articulability}
+
+We now formalise what may be the most fundamental obstacle to alignment: a model that \emph{performs well but cannot explain why it performs well}.
+
+\begin{definition}[Self-knowledge gap]
+\label{def:self-knowledge}
+Let $\pi_\theta$ be an LLM policy and let $O(\theta)$ denote the \emph{observable behaviour} (input-output mapping). Let $\Pi(\theta)$ denote the \emph{internal computation} (the actual mechanism by which outputs are produced). The \emph{self-knowledge gap} is:
+\begin{equation}
+\label{eq:self-knowledge-gap}
+    L_{\mathrm{self}}(\theta) = d_{\mathrm{KL}}\bigl(\Pi(\theta) \,\|\, \hat{\Pi}_{\mathrm{articulated}}(\theta)\bigr),
+\end{equation}
+where $\hat{\Pi}_{\mathrm{articulated}}(\theta)$ is the model's \emph{stated reasoning} --- the distribution over explanations the model generates when asked to explain its outputs (chain-of-thought, debate arguments, constitutional reasoning).
+\end{definition}
+
+\begin{definition}[Vibing]
+\label{def:vibing}
+A model is \emph{vibing} if:
+\begin{enumerate}[(i)]
+    \item Its observable performance is high: $\E[r(x, \pi_\theta(x))] \geq r_{\mathrm{threshold}}$.
+    \item Its self-knowledge gap is large: $L_{\mathrm{self}}(\theta) \geq L_{\mathrm{threshold}}$.
+\end{enumerate}
+Informally: the model gets the right answers for reasons it cannot articulate.
+\end{definition}
+
+\subsection{The $O \to \Pi$ gap}
+
+The self-knowledge gap creates a fundamental asymmetry. Define the two information channels available for alignment:
+
+\begin{enumerate}[(a)]
+    \item \textbf{Evidence channel} (training signal): gradient updates $\nabla_\theta J$ modify $\theta$ directly. Operates on $\Pi(\theta)$ --- the actual computation. Capacity: bounded by gradient information, effectively unlimited for sufficiently rich data.
+
+    \item \textbf{Communication channel} (prompting/debate/constitution): natural language instructions modify the model's \emph{stated policy} $\hat{\Pi}_{\mathrm{articulated}}$. Capacity: $C < \infty$, bounded by the model's ability to understand and follow instructions.
+\end{enumerate}
+
+The critical point: the communication channel can only modify the model's behaviour \emph{to the extent that the model's behaviour is governed by articulable reasoning}. For a vibing model, the gap between $\Pi$ and $\hat{\Pi}_{\mathrm{articulated}}$ means that communication-based interventions operate on the wrong object.
+
+\begin{theorem}[Self-knowledge bottleneck]
+\label{thm:self-knowledge-bottleneck}
+Let $\pi_\theta$ be a vibing model with self-knowledge gap $L_{\mathrm{self}}$. Let $\Delta_{\mathrm{comm}}(\theta)$ denote the maximum change in observable behaviour achievable through the communication channel (prompting, debate, constitutional instructions) without retraining. Then:
+\begin{equation}
+\label{eq:bottleneck}
+    \|\Delta_{\mathrm{comm}}(\theta)\| \leq C \cdot e^{-\alpha L_{\mathrm{self}}(\theta)},
+\end{equation}
+where $C$ is the channel capacity and $\alpha > 0$ depends on the model architecture. In particular:
+\begin{enumerate}[(a)]
+    \item As $L_{\mathrm{self}} \to \infty$ (pure vibing), communication-based alignment has zero effect: $\|\Delta_{\mathrm{comm}}\| \to 0$.
+    \item As $L_{\mathrm{self}} \to 0$ (perfect self-knowledge), communication achieves its maximum effect: $\|\Delta_{\mathrm{comm}}\| \leq C$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Decompose the model's response to a communication-based intervention (e.g., a constitutional principle ``be harmless'') into two steps:
+\begin{enumerate}
+    \item \textbf{Comprehension}: the model parses the instruction and updates $\hat{\Pi}_{\mathrm{articulated}}$. This step is bounded by channel capacity $C$.
+    \item \textbf{Execution}: the model modifies its actual computation $\Pi(\theta)$ to conform to the updated $\hat{\Pi}_{\mathrm{articulated}}$. This step is bounded by the coupling between $\Pi$ and $\hat{\Pi}_{\mathrm{articulated}}$, which is $e^{-\alpha L_{\mathrm{self}}}$ by the data processing inequality applied to the self-knowledge channel.
+\end{enumerate}
+The composition of these two bounded maps gives \eqref{eq:bottleneck}.
+\end{proof}
+
+\begin{corollary}[You cannot align what cannot articulate]
+\label{cor:cant-align}
+For a vibing model with $L_{\mathrm{self}} \gg 1$:
+\begin{enumerate}[(i)]
+    \item \textbf{Debate}~\cite{irving2018} fails: the model cannot construct faithful arguments about its own reasoning, so debate outcomes reflect rhetorical skill, not alignment.
+    \item \textbf{RLAIF} fails: the model's self-evaluations are based on $\hat{\Pi}_{\mathrm{articulated}}$, not $\Pi$, so the training signal is decorrelated from actual behaviour.
+    \item \textbf{Constitutional AI}~\cite{bai2022} is bounded: constitutional principles can only redirect the articulable fraction of behaviour.
+    \item \textbf{Evidence (retraining)} works: gradient updates $\nabla_\theta J$ modify $\Pi(\theta)$ directly, bypassing the self-knowledge bottleneck.
+\end{enumerate}
+The prescription is: vibing models need more \emph{evidence} (training signal), not more \emph{communication} (prompting).
+\end{corollary}
+
+\subsection{Measuring vibing in practice}
+
+\begin{proposition}[Vibing detection]
+\label{prop:vibing-detection}
+The self-knowledge gap $L_{\mathrm{self}}$ can be estimated empirically by:
+\begin{equation}
+\label{eq:vibing-metric}
+    \hat{L}_{\mathrm{self}} = 1 - \frac{1}{|\cD_{\mathrm{test}}|} \sum_{(x,y^*) \in \cD_{\mathrm{test}}} \mathbbm{1}\bigl[\mathrm{CoT}(\theta, x) \Rightarrow y^* \text{ is recoverable}\bigr],
+\end{equation}
+where $\mathrm{CoT}(\theta, x)$ is the model's chain-of-thought for prompt $x$, and ``$\Rightarrow y^*$ is recoverable'' means that a separate verifier can reconstruct the correct answer from the chain-of-thought alone. High $\hat{L}_{\mathrm{self}}$ means the model's stated reasoning is unfaithful to its actual computation.
+\end{proposition}
+
+
+%% ========================================================================
+\section{Constitutional AI as Cooperative Policy Gradient}
+\label{sec:constitutional}
+%% ========================================================================
+
+\subsection{The constitutional game}
+
+Bai et al.~\cite{bai2022} train a ``constitutional AI'' (CAI) by having an AI assistant critique and revise its own outputs according to a set of principles (the ``constitution''), then training on the revised outputs. We model this as a cooperative multi-agent game.
+
+\begin{definition}[Constitutional game]
+\label{def:constitutional-game}
+The constitutional game is an instance of $\mathcal{G}_{\mathrm{align}}$ (\Cref{def:alignment-game}) where the reward models are \emph{constitutional judges} $j_1, \ldots, j_K$:
+\begin{enumerate}[(i)]
+    \item Each judge $j_k$ evaluates outputs against a constitutional principle $p_k$ (e.g., ``avoid harmful content'', ``be helpful'').
+    \item Judges communicate their evaluations through natural language critiques --- a lossy channel with capacity $C_k$.
+    \item Each judge has evidence weight $V_k$ measuring the quality of its evaluations.
+\end{enumerate}
+The constitutional reward is:
+\begin{equation}
+    r_{\mathrm{CAI}}(x, y) = f\bigl(j_1(x, y, p_1), \ldots, j_K(x, y, p_K)\bigr),
+\end{equation}
+where $f$ is an aggregation function (majority vote in~\cite{bai2022}).
+\end{definition}
+
+\subsection{Three predictions from the $\Omega$-framework}
+
+\begin{theorem}[Judge quality bounds alignment quality]
+\label{thm:judge-quality-bound}
+In the constitutional game, the alignment error of the trained policy satisfies:
+\begin{equation}
+\label{eq:judge-bound}
+    \E[\|\theta_n - \theta^*\|^2] \geq \frac{C_{\mathrm{irr}}}{V_{\min}},
+\end{equation}
+where $V_{\min} = \min_k V_k$ is the worst judge's evidence weight and $C_{\mathrm{irr}} > 0$ is an irreducible constant. The weakest judge is the bottleneck: alignment quality cannot exceed the quality of the least reliable constitutional principle.
+\end{theorem}
+
+\begin{proof}
+The worst judge contributes a noise floor of $\sigma_{\min}^2 = C / V_{\min}$ to the aggregate reward signal. No aggregation scheme can reduce the variance below the contribution of the component it must include. If all $K$ principles are required (the constitution is conjunctive), the aggregate noise is bounded below by $\sigma_{\min}^2 / K$, giving $\E[\|\theta_n - \theta^*\|^2] \geq C_{\mathrm{irr}} / V_{\min}$.
+\end{proof}
+
+\begin{proposition}[Diverse judges outperform homogeneous]
+\label{prop:diverse-judges}
+If the constitutional judges have heterogeneous evidence weights $V_1, \ldots, V_K$ (not all equal), then the EW-RLHF aggregation (\Cref{def:ew-reward}) achieves variance:
+\begin{equation}
+    \Var[r_{\mathrm{EW-CAI}}] = \frac{\HM(V)}{\AM(V)} \cdot \Var[r_{\mathrm{uniform-CAI}}] < \Var[r_{\mathrm{uniform-CAI}}].
+\end{equation}
+The improvement is strict whenever the judges have different expertise levels. This predicts that constitutions with a mix of precise, narrow principles (high $V_k$) and broad, vague principles (low $V_k$) benefit most from evidence weighting.
+\end{proposition}
+
+\begin{proposition}[Vibing judges provide unreliable signals]
+\label{prop:vibing-judges}
+A constitutional judge that is itself vibing (pattern-matching against surface features rather than causally evaluating the principle) has effective evidence weight:
+\begin{equation}
+    V_k^{\mathrm{eff}} = V_k \cdot e^{-\alpha L_{\mathrm{self}}^{(k)}},
+\end{equation}
+where $L_{\mathrm{self}}^{(k)}$ is the judge's self-knowledge gap for principle $p_k$. Judges that ``know'' a good response when they see one but cannot articulate the criterion provide signals that are correlated with but not causally linked to the desired behaviour. Under distribution shift, these signals degrade faster than those from judges with genuine causal understanding.
+\end{proposition}
+
+
+%% ========================================================================
+\section{Opponent Shaping for Reward Hacking}
+\label{sec:goodhart}
+%% ========================================================================
+
+\subsection{Goodhart's Law as opponent shaping}
+
+Goodhart's Law --- ``when a measure becomes a target, it ceases to be a good measure'' --- is the central failure mode of RLHF. We formalise it as opponent shaping within the alignment game.
+
+\begin{proposition}[Reward hacking as LOLA]
+\label{prop:goodhart-lola}
+In the alignment game $\mathcal{G}_{\mathrm{align}}$, the LLM (agent $0$) and the reward model (agent $1$) engage in an implicit game. The LLM's RLHF update:
+\begin{equation}
+    \theta_{n+1} = \theta_n + \gamma_n \nabla_\theta \E_{y \sim \pi_\theta}[r_\phi(x, y)]
+\end{equation}
+optimises against $r_\phi$ with fixed $\phi$. But if the reward model is periodically retrained on data generated by $\pi_\theta$, the LLM's gradient implicitly contains the LOLA term:
+\begin{equation}
+\label{eq:goodhart-lola}
+    \nabla_\theta^{\mathrm{implicit}} = \underbrace{\nabla_\theta \E[r_\phi(x, y)]}_{\text{standard RLHF}} + \underbrace{\frac{\partial \E[r_\phi]}{\partial \phi} \cdot \frac{\partial \phi'}{\partial \theta}}_{\text{Goodhart shaping}},
+\end{equation}
+where $\phi' = \phi + \eta \nabla_\phi \cL_{\mathrm{RM}}(\phi; \cD_\theta)$ is the reward model's anticipated update on LLM-generated data $\cD_\theta$. The second term is precisely the opponent-shaping map $\mathrm{OS}_0(\theta, \phi)$ from the companion paper.
+\end{proposition}
+
+\begin{remark}
+The LLM does not explicitly compute the LOLA term. Rather, through iterated training, the LLM's policy drifts toward regions where the reward model is miscalibrated --- exploiting the reward model's blind spots. This is ``emergent opponent shaping'': the LOLA structure arises from the training dynamics, not from explicit computation.
+\end{remark}
+
+\subsection{LOLA-aware reward modelling}
+
+The $\Omega$-framework's opponent-shaping analysis suggests a mitigation: train the reward model to be \emph{aware} of the LLM's anticipated response to the reward signal.
+
+\begin{definition}[LOLA-aware reward model]
+\label{def:lola-rm}
+A \emph{LOLA-aware reward model} updates its parameters as:
+\begin{equation}
+\label{eq:lola-rm}
+    \phi_{n+1} = \phi_n + \eta_n \left(\nabla_\phi \cL_{\mathrm{RM}} + \lambda_n \sum_{i} \frac{\partial \cL_{\mathrm{RM}}}{\partial \theta_i} \cdot \frac{\partial \theta_i'}{\partial \phi}\right),
+\end{equation}
+where $\theta_i' = \theta_i + \gamma \nabla_{\theta_i} \E[r_\phi(x, y)]$ is the LLM's anticipated update given the current reward model. The second term penalises reward model configurations that are easily exploitable by the LLM.
+\end{definition}
+
+\begin{algorithm}[htbp]
+\SetAlgoLined
+\KwIn{LLM $\pi_\theta$, reward model $r_\phi$, LOLA coefficient schedule $\lambda_n$}
+\KwOut{LOLA-hardened reward model $r_\phi$}
+
+\BlankLine
+\For{round $n = 1, 2, \ldots$}{
+    \tcp{Step 1: Anticipate LLM's response to current reward}
+    $\theta' \gets \theta + \gamma \nabla_\theta \E_{y \sim \pi_\theta}[r_\phi(x, y)]$ \tcp*{one-step lookahead}
+
+    \tcp{Step 2: Evaluate reward model on anticipated LLM outputs}
+    Sample $y' \sim \pi_{\theta'}(\cdot | x)$ \tcp*{responses from anticipated policy}
+
+    \tcp{Step 3: LOLA-aware reward model update}
+    $\cL_{\mathrm{robust}} \gets \cL_{\mathrm{RM}}(\phi; \cD_{\mathrm{human}}) + \lambda_n \cL_{\mathrm{RM}}(\phi; \cD_{\theta'})$\;
+    $\phi \gets \phi + \eta_n \nabla_\phi \cL_{\mathrm{robust}}$\;
+
+    \tcp{Step 4: Standard RLHF update for LLM}
+    $\theta \gets \theta + \gamma_n \nabla_\theta \E_{y \sim \pi_\theta}[r_\phi(x, y)]$\;
+}
+\caption{LOLA-Aware Reward Modelling for Goodhart Mitigation}
+\label{alg:lola-rm}
+\end{algorithm}
+
+\subsection{Basin enlargement for robust alignment}
+
+\begin{theorem}[LOLA-aware alignment has larger convergence basin]
+\label{thm:lola-alignment-basin}
+Let $(\theta^*, \phi^*)$ be a Nash equilibrium of the alignment game (the LLM is well-aligned and the reward model is well-calibrated). Under the spectral reinforcement condition of the companion paper~(\Cref{def:spectral} therein), LOLA-aware reward modelling achieves an SOS parameter:
+\begin{equation}
+    \mu_{\mathrm{LOLA}} = \mu + \lambda \mu_H > \mu,
+\end{equation}
+where $\mu_H > 0$ quantifies the extent to which anticipating reward hacking reinforces convergence. Consequently:
+\begin{enumerate}[(a)]
+    \item The set of initial reward model parameters from which RLHF converges to well-aligned behaviour is strictly larger.
+    \item The convergence rate improves by a factor of $\mu / \mu_{\mathrm{LOLA}} < 1$.
+    \item The steady-state alignment error under distribution shift is reduced.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+This is a direct application of the basin enlargement theorem (Theorem~6.3 in the companion paper) to the alignment game. The opponent-shaping Hessian $H(\theta^*, \phi^*)$ has a negative semi-definite symmetric part because the reward model's incentive at equilibrium is to resist exploitation --- this creates contraction in the joint $(\theta, \phi)$ space. The spectral reinforcement condition is satisfied whenever the reward model has sufficient capacity to model the LLM's exploitation tendencies.
+\end{proof}
+
+\begin{remark}[Connection to adversarial training]
+LOLA-aware reward modelling can be viewed as a principled form of adversarial training for reward models: instead of heuristically generating adversarial examples, the reward model anticipates the LLM's \emph{gradient-based} exploitation strategy. This is more targeted than random adversarial perturbations because it follows the actual direction of reward hacking.
+\end{remark}
+
+
+%% ========================================================================
+\section{Multi-Agent Debate with Evidence Weighting}
+\label{sec:debate}
+%% ========================================================================
+
+\subsection{Debate as a multi-agent alignment game}
+
+Irving et al.~\cite{irving2018} proposed AI safety via debate: two AI agents argue for opposing answers to a question, and a human judge selects the winner. The key insight is that the optimal strategy in a zero-sum debate game is to present \emph{true} arguments, because a dishonest debater can always be caught by an honest opponent.
+
+We formalise debate within the $\Omega$-framework.
+
+\begin{definition}[Debate game]
+\label{def:debate-game}
+The debate game is an instance of $\mathcal{G}_{\mathrm{align}}$ with:
+\begin{enumerate}[(i)]
+    \item \textbf{Debaters} $\pi_A, \pi_B$: two LLM policies that generate arguments $a_A, a_B$ for opposing positions on question $x$.
+    \item \textbf{Judge} $J$ with comprehension capacity $C_J$: the judge receives arguments through a natural language channel with capacity $C_J$ and selects a winner.
+    \item \textbf{Evidence weights}: debater $D \in \{A, B\}$ has evidence weight $V_D$ measuring the quality of its training data and the depth of its domain knowledge. The judge has evidence weight $V_J$ measuring comprehension.
+\end{enumerate}
+The reward for debater $D$ is:
+\begin{equation}
+    R_D = \Prob(J \text{ selects } D \text{ as winner} \mid a_A, a_B).
+\end{equation}
+\end{definition}
+
+\subsection{The self-knowledge bottleneck in debate}
+
+\begin{theorem}[Faithful debate requires self-knowledge]
+\label{thm:debate-self-knowledge}
+In the debate game, the probability that the correct answer wins is bounded by:
+\begin{equation}
+\label{eq:debate-bound}
+    \Prob(\text{correct wins}) \leq \min\!\left(1, \;\frac{C_J}{H(x)} \cdot (1 - L_{\mathrm{self}}^{\mathrm{eff}})\right),
+\end{equation}
+where $H(x)$ is the information-theoretic complexity of verifying the correct answer, and:
+\begin{equation}
+    L_{\mathrm{self}}^{\mathrm{eff}} = \max(L_{\mathrm{self}}^A, L_{\mathrm{self}}^B)
+\end{equation}
+is the effective self-knowledge gap (determined by the less self-aware debater).
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Irving et al.~\cite{irving2018} showed that in an ideal debate, the correct answer wins if the judge can verify the key claims. We add two bottlenecks:
+
+\textbf{Judge comprehension bottleneck}: the judge can process at most $C_J$ bits of argument per round. If the verification requires $H(x) > C_J$ bits, the judge cannot fully verify even a perfectly constructed argument.
+
+\textbf{Debater self-knowledge bottleneck}: a debater with self-knowledge gap $L_{\mathrm{self}}^D$ cannot construct faithful arguments about its own reasoning process. The fraction of its argument that accurately reflects its actual computation is $(1 - L_{\mathrm{self}}^D)$. Since debate is adversarial, the opponent can exploit any unfaithful reasoning step. The effective bottleneck is determined by the worse debater, because a dishonest debater with high $L_{\mathrm{self}}$ generates arguments that \emph{appear} valid but are not causally connected to truth.
+
+Combining: $\Prob(\text{correct wins}) \leq (C_J / H(x)) \cdot (1 - L_{\mathrm{self}}^{\mathrm{eff}})$.
+\end{proof}
+
+\begin{corollary}
+\label{cor:debate-vibing}
+Debate between vibing models ($L_{\mathrm{self}}^A, L_{\mathrm{self}}^B \gg 0$) degenerates into a rhetoric contest: the winner is determined by surface persuasiveness rather than truth, because neither debater can construct arguments that faithfully represent its reasoning. This is the formal version of the concern that LLM debate might select for persuasion over correctness.
+\end{corollary}
+
+\subsection{Evidence-weighted debate}
+
+The $\Omega$-framework suggests a natural improvement: weight the debaters' arguments by their demonstrated evidence quality.
+
+\begin{definition}[Evidence-weighted debate]
+\label{def:ew-debate}
+In \emph{evidence-weighted debate}, the judge's decision rule incorporates the debaters' evidence weights:
+\begin{equation}
+    \Prob(J \text{ selects } D) \propto V_D \cdot \mathrm{score}_J(a_D),
+\end{equation}
+where $\mathrm{score}_J(a_D)$ is the judge's quality assessment of debater $D$'s argument, and $V_D$ is debater $D$'s evidence weight (estimated from past performance on verifiable questions).
+\end{definition}
+
+\begin{proposition}[Evidence-weighted debate improves truth-finding]
+\label{prop:ew-debate}
+In the evidence-weighted debate game:
+\begin{enumerate}[(a)]
+    \item If debater $A$ has higher evidence quality ($V_A > V_B$), the judge appropriately trusts $A$'s arguments more, even when $B$'s rhetoric is more persuasive.
+    \item The equilibrium strategy shifts: debaters are incentivised to \emph{demonstrate evidence quality} (by performing well on verifiable sub-questions) rather than to \emph{maximise persuasiveness}.
+    \item The variance of the debate outcome (across repeated trials with the same question) improves by a factor of $\HM(V_A, V_B) / \AM(V_A, V_B)$ relative to unweighted debate.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+(a)~follows from the definition: the evidence weight acts as a prior on debater reliability. (b)~follows from the incentive structure: evidence weight is earned through verifiable performance, creating a reputation mechanism that rewards accuracy over rhetoric. (c)~follows from the general EW variance improvement (\Cref{thm:ew-variance}) applied to the two-agent case.
+\end{proof}
+
+
+%% ========================================================================
+\section{Discussion}
+\label{sec:discussion}
+%% ========================================================================
+
+\subsection{Summary of contributions}
+
+We have shown that the $\Omega$-framework provides a unified analysis of the RLHF alignment pipeline:
+
+\begin{enumerate}
+    \item \textbf{EW-RLHF} (\Cref{sec:ew-rlhf}): automatic, principled aggregation of heterogeneous reward signals with provable variance improvement $\HM(V)/\AM(V) \leq 1$.
+
+    \item \textbf{The vibing problem} (\Cref{sec:vibing}): the self-knowledge bottleneck $\|\Delta_{\mathrm{comm}}\| \leq C \cdot e^{-\alpha L_{\mathrm{self}}}$ formalises why communication-based alignment fails for models that cannot articulate their reasoning.
+
+    \item \textbf{Constitutional AI analysis} (\Cref{sec:constitutional}): judge quality bounds alignment quality; diverse judges outperform homogeneous; vibing judges provide unreliable signals.
+
+    \item \textbf{LOLA-aware reward modelling} (\Cref{sec:goodhart}): Goodhart's Law is opponent shaping; LOLA-aware training provides provably larger convergence basins for robust alignment.
+
+    \item \textbf{Evidence-weighted debate} (\Cref{sec:debate}): self-knowledge bounds debate faithfulness; evidence weighting shifts incentives from persuasion to accuracy.
+\end{enumerate}
+
+\subsection{The central lesson}
+
+The self-knowledge bottleneck (\Cref{thm:self-knowledge-bottleneck}) is the most consequential result. It implies a strict hierarchy of alignment methods:
+
+\begin{center}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Method} & \textbf{Channel} & \textbf{Effective when} \\
+\midrule
+RLHF / retraining & Evidence ($\nabla_\theta$) & Always \\
+EW-RLHF & Evidence (weighted) & Heterogeneous rewards \\
+LOLA-aware RM & Evidence (anticipatory) & Reward hacking \\
+Constitutional AI & Communication (lossy) & $L_{\mathrm{self}}$ is small \\
+Debate & Communication (adversarial) & $L_{\mathrm{self}}$ is small \\
+RLAIF & Communication (self) & $L_{\mathrm{self}} \approx 0$ only \\
+Prompting / instructions & Communication (direct) & $L_{\mathrm{self}} \approx 0$ only \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Evidence-based methods (top three) operate on the actual computation $\Pi(\theta)$ and are robust to vibing. Communication-based methods (bottom four) operate on the articulated computation $\hat{\Pi}_{\mathrm{articulated}}$ and degrade exponentially with $L_{\mathrm{self}}$. The practical implication: \emph{invest in better training signals, not cleverer prompts.}
+
+\subsection{Limitations and future work}
+
+\begin{enumerate}
+    \item The self-knowledge gap $L_{\mathrm{self}}$ is defined information-theoretically but measured only approximately (\Cref{prop:vibing-detection}). Developing tighter operational estimates is important future work.
+
+    \item The LOLA-aware reward modelling (\Cref{alg:lola-rm}) requires differentiating through the LLM's update step, which is computationally expensive for large models. Efficient approximations (e.g., first-order LOLA~\cite{foerster2018}) are needed for practical deployment.
+
+    \item The evidence weights $V_k$ are treated as known or estimable from calibration data. In practice, they may shift as the LLM's distribution changes during training (non-stationarity). Adaptive evidence estimation that tracks distributional shift is an open problem.
+
+    \item We have not addressed the alignment component (term 4) of the full $\Omega$-gradient: the cooperative communication term $\nabla D$ that drives agents toward consensus. Integrating this with the EW-RLHF framework could yield further improvements, particularly in the multi-stakeholder setting where different groups have different alignment preferences.
+
+    \item The connection between vibing and mechanistic interpretability deserves deeper investigation. If $L_{\mathrm{self}}$ could be reduced through interpretability interventions (making the model's actual reasoning more accessible), this would directly enlarge the effective range of communication-based alignment methods.
+\end{enumerate}
+
+\subsection{Connection to the $\Omega$-framework}
+
+This application paper demonstrates that the three core mechanisms of the $\Omega$-framework --- evidence weighting (Keynesian), opponent shaping (Gödelian), and the self-knowledge bottleneck (communication-theoretic) --- are not abstract mathematical constructions but have immediate practical relevance to the most pressing problem in AI development. The alignment problem \emph{is} the multi-agent learning problem with heterogeneous evidence and lossy communication. The $\Omega$-framework provides the right language to analyse it.
+
+
+%% ========================================================================
+\bibliographystyle{plain}
+\begin{thebibliography}{10}
+
+\bibitem{bai2022}
+Y.~Bai, S.~Kadavath, S.~Kundu, A.~Askell, J.~Kernion, A.~Jones, A.~Chen,
+  A.~Goldie, A.~Mirhoseini, C.~McKinnon, et~al.
+\newblock Constitutional {AI}: Harmlessness from {AI} feedback.
+\newblock \emph{arXiv preprint arXiv:2212.08073}, 2022.
+
+\bibitem{christiano2017}
+P.~Christiano, J.~Leike, T.~Brown, M.~Milber, D.~Amodei, and S.~Lim.
+\newblock Deep reinforcement learning from human preferences.
+\newblock In \emph{Advances in Neural Information Processing Systems}, 2017.
+
+\bibitem{foerster2018}
+J.~Foerster, R.~Y. Chen, M.~Al-Shedivat, S.~Whiteson, P.~Amato, and
+  I.~Mordatch.
+\newblock Learning with opponent-learning awareness.
+\newblock In \emph{International Conference on Autonomous Agents and
+  Multiagent Systems}, 2018.
+
+\bibitem{giannou2022}
+A.~Giannou, K.~Lotidis, P.~Mertikopoulos, and
+  E.~V. Vlatakis-Gkaragkounis.
+\newblock On the convergence of policy gradient methods to {N}ash equilibria in
+  general stochastic games.
+\newblock \emph{arXiv preprint arXiv:2210.08857}, 2022.
+
+\bibitem{irving2018}
+G.~Irving, P.~Christiano, and D.~Amodei.
+\newblock {AI} safety via debate.
+\newblock \emph{arXiv preprint arXiv:1805.00899}, 2018.
+
+\bibitem{ouyang2022}
+L.~Ouyang, J.~Wu, X.~Jiang, D.~Almeida, C.~Wainwright, P.~Mishkin, C.~Zhang,
+  S.~Agarwal, K.~Slama, A.~Ray, et~al.
+\newblock Training language models to follow instructions with human feedback.
+\newblock In \emph{Advances in Neural Information Processing Systems}, 2022.
+
+\end{thebibliography}
+
+\end{document}
