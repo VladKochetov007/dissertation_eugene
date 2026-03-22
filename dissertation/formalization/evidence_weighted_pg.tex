@@ -6,6 +6,7 @@
 \usepackage{enumerate}
 \usepackage{hyperref}
 \usepackage{cleveref}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
 
 \newtheorem{theorem}{Theorem}[section]
 \newtheorem{lemma}[theorem]{Lemma}
@@ -484,5 +485,62 @@ F.~A.~Hayek.
 \newblock \emph{American Economic Review}, 35(4):519--530, 1945.
 
 \end{thebibliography}
+
+
+\appendix
+\section{Pseudocode}\label{app:algorithms}
+
+\begin{algorithm}[H]
+\caption{Evidence-Weighted Policy Gradient (EW-PG)}\label{alg:ewpg}
+\KwIn{Stochastic game $\mathcal{G}$, $N$ agents, learning rates $\gamma_n = \gamma/(n+m)^p$}
+\KwIn{Evidence decay $\alpha \in (0,1)$, minimum evidence $V_{\min} > 0$}
+\KwOut{Policies $\{\pi_i\}_{i=1}^N$ converging to stable Nash}
+\BlankLine
+Initialize $\pi_i \in \Pi$ for each agent $i$\;
+Initialize running variance estimates $\hat{V}_i \leftarrow V_{\min}$ for each $i$\;
+\BlankLine
+\For{$n = 1, 2, \ldots$}{
+  \BlankLine
+  \tcp{--- Phase 1: Rollout and gradient estimation ---}
+  \For{$i = 1, \ldots, N$}{
+    Collect trajectory $\tau_i \sim \pi_i$ in current game state\;
+    Compute policy gradient estimate $\hat{v}_{i,n}$ via REINFORCE:\;
+    \Indp
+    $\hat{v}_{i,n} \leftarrow \frac{1}{|\mathcal{B}|}\sum_{\tau \in \mathcal{B}} R(\tau) \cdot \nabla_{\theta_i} \log \pi_{\theta_i}(\tau)$\;
+    \Indm
+  }
+  \BlankLine
+  \tcp{--- Phase 2: Evidence estimation ---}
+  \For{$i = 1, \ldots, N$}{
+    Update variance estimate (exponential moving average):\;
+    $\hat{V}_{i,n} \leftarrow \alpha \cdot \hat{V}_{i,n-1} + (1 - \alpha) \cdot \|\hat{v}_{i,n} - \bar{v}_{i}\|^2$\;
+    Clamp: $\hat{V}_{i,n} \leftarrow \max(\hat{V}_{i,n},\; V_{\min})$\;
+  }
+  \BlankLine
+  \tcp{--- Phase 3: Evidence-weighted update ---}
+  $V_{\min,n} \leftarrow \min_i \hat{V}_{i,n}$\;
+  \For{$i = 1, \ldots, N$}{
+    Compute Keynesian evidence weight:\;
+    $w_{i,n} \leftarrow V_{\min,n}\, /\, \hat{V}_{i,n} \qquad \in (0, 1]$\;
+    \BlankLine
+    Update policy with evidence-weighted step:\;
+    $\pi_{i,n+1} \leftarrow \proj_\Pi\!\bigl(\pi_{i,n} + \gamma_n \cdot w_{i,n} \cdot \hat{v}_{i,n}\bigr)$\;
+  }
+}
+\end{algorithm}
+
+\begin{remark}[Implementation notes]
+\begin{enumerate}
+  \item The variance estimate $\hat{V}_{i,n}$ uses exponential moving average
+    for stability. Alternative: batch variance over a sliding window.
+  \item The minimum evidence $V_{\min}$ prevents division by zero and ensures
+    all agents make some progress. In practice, set $V_{\min} = 10^{-6}$.
+  \item The projection $\proj_\Pi$ is onto the simplex $\Delta(\mathcal{A}_i)^{|\mathcal{S}|}$,
+    implementable in $O(|\mathcal{A}| \log |\mathcal{A}|)$ via sorting.
+  \item The variance improvement ratio $\HM(V)/\AM(V)$ is not computed
+    explicitly --- it emerges from the weighted updates. It can be monitored
+    as a diagnostic: $\rho_n = N \cdot V_{\min,n} / \sum_i \hat{V}_{i,n}$.
+\end{enumerate}
+\end{remark}
 
 \end{document}

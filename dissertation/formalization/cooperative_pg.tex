@@ -1,0 +1,579 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{axiom_}{Axiom}[section]
+
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator{\proj}{proj}
+\DeclareMathOperator{\HM}{HM}
+\DeclareMathOperator{\AM}{AM}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator{\diag}{diag}
+
+\title{Cooperative Policy Gradient with Lossy Communication\\
+in General Stochastic Games}
+\author{Eugene Shcherbinin}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We extend the evidence-weighted policy gradient (EW-PG) and opponent-shaping
+PG (LOLA-PG) frameworks to cooperative settings where agents form coalitions
+and communicate policies through lossy channels. Three key contributions:
+(1)~We formalize the \emph{self-knowledge problem}: an agent's ability to
+communicate its policy is bounded by its evidence quality, connecting the
+$\mathcal{O} \to \Pi$ inference gap to information-theoretic communication
+limits. (2)~We show that communication introduces a bias decomposable into
+self-knowledge loss and channel loss, with convergence preserved under
+annealed cooperation. (3)~We prove that coalition formation enlarges the
+basin of attraction through a cooperative reinforcement mechanism dual to
+LOLA's spectral reinforcement. The evidence weight $w_i$ serves triple
+duty: gradient quality, self-knowledge, and communication quality --- all
+manifestations of the same underlying information content. This completes
+the formalization of all five components of the $\Omega$-gradient.
+\end{abstract}
+
+
+\section{The Self-Knowledge Problem}
+
+\subsection{The $\mathcal{O} \to \Pi$ Gap}
+
+In the standard PG framework, agent~$i$ has policy $\pi_i \in \Pi$ and
+computes gradient estimates $\hat{v}_i$ to improve it. The implicit
+assumption is that the agent \emph{knows} its own policy. But in the
+$\Omega$-framework, agents operate in observation space $\mathcal{O}$
+and their policy is an implicit function of parameters~$\theta_i$:
+\[
+  \pi_i = \pi_{\theta_i} : \mathcal{S} \to \Delta(\mathcal{A}_i).
+\]
+The agent does not have direct introspective access to the function
+$\pi_{\theta_i}$. It can only \emph{infer} a self-model $\hat{\pi}_i$
+from its observations:
+\[
+  \hat{\pi}_i = f(o_1, a_1, r_1, \ldots, o_t) \approx \pi_i.
+\]
+
+\begin{definition}[Self-knowledge loss]
+The self-knowledge loss of agent~$i$ is:
+\begin{equation}\label{eq:self-knowledge}
+  L_{\text{self}}^{(i)} \;=\; \mathbb{E}\bigl[\|\pi_i - \hat{\pi}_i\|^2\bigr].
+\end{equation}
+This measures the gap between ``what I do'' and ``what I think I do.''
+\end{definition}
+
+\begin{remark}[The ``vibing'' agent]
+An agent that performs well through habitual or intuitive action --- what
+we call ``vibing'' --- has a good policy~$\pi_i$ but a poor self-model
+$\hat{\pi}_i$. In flow-state terms (Parvizi-Wayne et al.\ 2024), the
+explicit self-model is attenuated while implicit performance is optimal.
+In Polanyi's terms, the agent has \emph{tacit knowledge} that it cannot
+articulate.
+\end{remark}
+
+\subsection{Evidence as Self-Knowledge}
+
+The self-knowledge loss is related to the evidence variance $V_i$ from
+the EW-PG framework. Both are driven by the same information deficit:
+insufficient experience to resolve the $\mathcal{O} \to \Pi$ mapping.
+
+\begin{axiom_}[Self-knowledge--evidence relationship]\label{ax:self-ev}
+For each agent~$i$ with evidence variance $V_i > 0$:
+\begin{equation}\label{eq:self-ev}
+  L_{\text{self}}^{(i)} \;\leq\; V_i.
+\end{equation}
+\end{axiom_}
+
+\noindent\textbf{Justification.}
+By the data processing inequality,
+$I(\pi_i;\, \hat{\pi}_i) \leq I(\pi_i;\, \mathcal{O}_i)$.
+The evidence variance $V_i$ is inversely related to $I(\pi_i;\, \mathcal{O}_i)$:
+high variance means the observation history is insufficient to pin down
+the value function, and \emph{a fortiori} insufficient to pin down the policy.
+The bound \eqref{eq:self-ev} makes this precise.
+
+
+\section{The Communication Channel}
+
+\subsection{End-to-End Communication}
+
+When agent~$i$ communicates its policy to teammate~$j$, the information
+passes through three stages:
+\begin{equation}\label{eq:comm-chain}
+  \underbrace{\pi_i}_{\text{true}} \;\xrightarrow{\text{self-model}}\;
+  \underbrace{\hat{\pi}_i}_{\text{inferred}} \;\xrightarrow{\text{channel}}\;
+  \underbrace{\tilde{\pi}_i^{(j)}}_{\text{received}}
+\end{equation}
+
+\begin{definition}[Communication loss]
+The total communication loss for agent~$j$'s model of agent~$i$:
+\begin{equation}
+  L_{\text{comm}}^{(i \to j)} \;=\; \mathbb{E}\bigl[\|\pi_i - \tilde{\pi}_i^{(j)}\|^2\bigr].
+\end{equation}
+\end{definition}
+
+\begin{theorem}[Loss decomposition]\label{thm:loss-decomp}
+The communication loss decomposes as:
+\begin{equation}\label{eq:loss-decomp}
+  L_{\text{comm}}^{(i \to j)} \;\leq\; 2\,L_{\text{self}}^{(i)} + 2\,L_{\text{channel}}^{(i \to j)}
+\end{equation}
+where $L_{\text{channel}}^{(i \to j)} = \mathbb{E}[\|\hat{\pi}_i - \tilde{\pi}_i^{(j)}\|^2]$
+is the pure channel distortion.
+\end{theorem}
+
+\begin{proof}
+Write $\pi_i - \tilde{\pi}_i^{(j)} = (\pi_i - \hat{\pi}_i) + (\hat{\pi}_i - \tilde{\pi}_i^{(j)})$.
+By $\|a + b\|^2 \leq 2\|a\|^2 + 2\|b\|^2$ (which follows from $(|a| - |b|)^2 \geq 0$),
+we get \eqref{eq:loss-decomp}.
+\end{proof}
+
+\begin{corollary}[Self-knowledge bottleneck]\label{cor:bottleneck}
+Even with a perfect channel ($L_{\text{channel}} = 0$):
+\begin{equation}
+  L_{\text{comm}}^{(i \to j)} \;\leq\; 2\,V_i.
+\end{equation}
+\emph{An agent that doesn't know its own policy cannot communicate it.}
+\end{corollary}
+
+\subsection{Rate-Distortion with Self-Knowledge Floor}
+
+The communication problem connects to Shannon's rate-distortion theory.
+Agent~$i$ encodes $\hat{\pi}_i$ at rate $R$ (bits per policy dimension).
+The channel's rate-distortion function $D_{\text{ch}}(R)$ gives the minimum
+achievable channel distortion at rate~$R$.
+
+The total distortion has a floor:
+\begin{equation}\label{eq:rate-distortion}
+  D_{\text{total}}(R) \;\geq\; \max\bigl(D_{\text{ch}}(R),\; L_{\text{self}}\bigr).
+\end{equation}
+
+\begin{remark}[Bandwidth vs.\ evidence]
+When $L_{\text{self}} > D_{\text{ch}}(R)$, the bottleneck is self-knowledge,
+not bandwidth. Increasing channel capacity does not help --- the agent needs
+more \emph{evidence}, not more bandwidth. The crossover rate
+$R^* : D_{\text{ch}}(R^*) = L_{\text{self}}$ defines sufficient bandwidth
+for the agent's evidence level.
+\end{remark}
+
+
+\section{Coalition Formation}
+
+\subsection{Coalition Rationality}
+
+\begin{definition}[Coalition value]
+In an $N$-player stochastic game, the coalition value $V(S)$ for
+$S \subseteq \{1,\ldots,N\}$ is the joint expected payoff when members
+of~$S$ coordinate their policies.
+\end{definition}
+
+\begin{definition}[Rational coalition]
+Coalition~$S$ is \emph{rational} if:
+\begin{equation}\label{eq:coalition-rational}
+  V(S) \;>\; \sum_{i \in S} V(\{i\}).
+\end{equation}
+The excess $V(S) - \sum_i V(\{i\})$ is the \emph{coordination premium}.
+\end{definition}
+
+\begin{remark}[Competitive coalitions]
+Condition \eqref{eq:coalition-rational} applies in \emph{competitive}
+games too. In a 6-player game, a 3-player coalition may outperform
+three individuals playing against the opposing coalition. This is the
+formal version of ``it pays to have allies even in competitive settings.''
+\end{remark}
+
+\subsection{Communication-Adjusted Coalition Value}
+
+The actual coalition value depends on communication quality:
+\begin{equation}
+  V_{\text{comm}}(S) \;=\; V(S) - \underbrace{\sum_{i \in S} C_i \cdot L_{\text{comm}}^{(i)}}_{\text{coordination loss from imperfect communication}}
+\end{equation}
+where $C_i$ is the marginal coordination value of agent~$i$.
+
+Coalition~$S$ remains rational under imperfect communication iff:
+\begin{equation}
+  V_{\text{comm}}(S) \;>\; \sum_{i \in S} V(\{i\}).
+\end{equation}
+
+Using the loss decomposition (Theorem~\ref{thm:loss-decomp}) and the
+evidence bound (Axiom~\ref{ax:self-ev}):
+\begin{equation}
+  V_{\text{comm}}(S) \;\geq\; V(S) - 2\sum_{i \in S} C_i\,(V_i + L_{\text{ch}}^{(i)}).
+\end{equation}
+
+\emph{High-evidence agents (low $V_i$) are more valuable coalition members.}
+
+
+\section{The Cooperative Gradient}
+
+\subsection{Update Rule}
+
+When agent~$i$ is in coalition~$S$, its gradient is augmented with a
+cooperative correction based on communicated policies:
+\begin{equation}\label{eq:coop-update}
+  \pi_{i,n+1} = \proj_\Pi\Bigl(\pi_{i,n} + \gamma_n \cdot w_i \cdot
+    \bigl(\hat{v}_{i,n} + \beta_n \cdot \text{coop}_i(\pi_n, \tilde{\pi}_{S \setminus i})\bigr)\Bigr)
+\end{equation}
+where:
+\begin{itemize}
+  \item $w_i = V_{\min}/V_i$ is the evidence weight (from EW-PG),
+  \item $\beta_n$ is the cooperation strength schedule,
+  \item $\text{coop}_i$ is the cooperative correction from communicated policies.
+\end{itemize}
+
+\begin{remark}[Triple-duty evidence weight]
+The weight $w_i$ multiplies \emph{both} the standard gradient and the
+cooperative term. This is correct: if agent~$i$ has poor self-knowledge
+(high $V_i$, low $w_i$), it should downweight its cooperative contribution
+too, since its self-model is unreliable. The evidence weight does triple duty:
+\begin{enumerate}
+  \item \textbf{Gradient quality}: reduces PG variance (EW-PG, Theorem~5.1 of \cite{ewpg}).
+  \item \textbf{Self-knowledge}: bounds $L_{\text{self}}$ (Axiom~\ref{ax:self-ev}).
+  \item \textbf{Communication quality}: bounds $L_{\text{comm}}$ (Corollary~\ref{cor:bottleneck}).
+\end{enumerate}
+All three are manifestations of the same underlying information content.
+\end{remark}
+
+\subsection{Communication Bias}
+
+The cooperative term uses $\tilde{\pi}_j$ (communicated) instead of
+$\pi_j$ (true). This introduces bias:
+\begin{equation}
+  \|\text{coop}(\pi, \pi_{S}) - \text{coop}(\pi, \tilde{\pi}_{S})\|
+  \;\leq\; L_{\text{coop}} \cdot \sqrt{L_{\text{comm}}}
+  \;\leq\; L_{\text{coop}} \cdot \sqrt{2V_i + 2L_{\text{ch}}}
+\end{equation}
+where $L_{\text{coop}}$ is the Lipschitz constant of the cooperative term.
+
+
+\section{Convergence Analysis}
+
+\subsection{Annealed Cooperation Preserves Convergence}
+
+\begin{theorem}[Convergence of annealed cooperative PG]\label{thm:coop-conv}
+Under the conditions of Giannou et al.\ (2022), with:
+\begin{itemize}
+  \item $\gamma_n = \gamma/(n+m)^p$, $p \in (1/2, 1]$
+  \item $\beta_n = \beta/(n+m)^r$, $r > 1 - p$
+  \item Cooperative term bounded: $\|\text{coop}(\pi)\| \leq K$
+  \item Cooperative term vanishes at Nash: $\text{coop}(\pi^*) = 0$
+\end{itemize}
+the cooperative PG \eqref{eq:coop-update} converges to stable Nash
+at the same rate as standard PG.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Identical structure to annealed LOLA (OpponentShapingPG, Theorem~4.3).
+The cooperative term adds $\beta_n K$ to the bias bound:
+$\|b_n^{\text{coop}}\| \leq B_n + \beta_n K = O(n^{-\min(\ell_b, r)})$.
+The condition $r > 1 - p$ ensures $p + \min(\ell_b, r) > 1$,
+so Giannou's Theorem~1 applies with the augmented bias.
+\end{proof}
+
+\subsection{Cooperative Basin Enlargement}
+
+\begin{definition}[Cooperative reinforcement]
+The cooperative Hessian $H_C = \nabla_\pi\,\text{coop}(\pi^*)$ is
+\emph{cooperatively reinforcing} if its symmetric part
+$S_C = (H_C + H_C^\top)/2$ is negative semi-definite.
+\end{definition}
+
+\begin{theorem}[Basin enlargement]\label{thm:coop-basin}
+Under cooperative reinforcement, the cooperative PG has SOS parameter:
+\begin{equation}
+  \mu_{\text{coop}} = \mu + \beta \cdot \mu_C
+\end{equation}
+where $-\mu_C$ is the largest eigenvalue of $S_C$ (so $\mu_C \geq 0$).
+The basin of attraction is strictly larger when $\mu_C > 0$.
+\end{theorem}
+
+
+\section{The Complete $\Omega$-Gradient}
+
+Combining all three mechanisms, the full multi-agent gradient is:
+\begin{equation}\label{eq:full-gradient}
+  \boxed{
+    \pi_{i,n+1} = \proj_\Pi\Bigl(\pi_{i,n} + \gamma_n \cdot w_i \cdot
+    \bigl(\underbrace{\hat{v}_{i,n}}_{\text{PG}}
+    + \underbrace{\lambda_n \cdot \text{OS}(\pi_n)}_{\text{LOLA}}
+    + \underbrace{\beta_n \cdot \text{coop}(\pi_n, \tilde{\pi}_S)}_{\text{coalition}}\bigr)\Bigr)
+  }
+\end{equation}
+
+\begin{theorem}[Full $\Omega$-PG convergence]\label{thm:full}
+The update \eqref{eq:full-gradient} with annealed schedules
+$\lambda_n, \beta_n \to 0$ achieves:
+\begin{enumerate}
+  \item \textbf{Variance improvement}: $\HM(V)/\AM(V)$ from evidence weighting.
+  \item \textbf{Opponent-shaping basin}: $\mu + \lambda \mu_H$ from LOLA.
+  \item \textbf{Cooperative basin}: $\mu + \beta \mu_C$ from communication.
+  \item \textbf{Combined}: $\mu_{\text{full}} = \mu + \lambda \mu_H + \beta \mu_C$,
+        $C_{\text{full}} = \frac{\HM}{\AM} \cdot C_{\text{std}}$.
+\end{enumerate}
+The three mechanisms are orthogonal: evidence weighting affects~$C$,
+opponent shaping and cooperation affect~$\mu$ through independent
+Hessian contributions.
+\end{theorem}
+
+\subsection{Mapping to the $\Omega$-Framework (theos eq.~27)}
+
+The five gradient components from the $\Omega$-framework are now
+fully covered:
+\begin{center}
+\begin{tabular}{cll}
+\hline
+\textbf{Component} & \textbf{$\Omega$-framework} & \textbf{Formalization} \\
+\hline
+(1) Exploration    & $\mathbb{E}[L \cdot s_\theta]$   & $\hat{v}_i$ (REINFORCE) \\
+(2) Exploitation   & $\mathbb{E}[\nabla_\theta L]$    & $\hat{v}_i$ (backprop)  \\
+(3) Evidence       & $-\mu V^{-2}\nabla V$            & $w_i$ (Keynesian weight) \\
+(4) Alignment      & $\nabla D$                        & $\beta_n \cdot \text{coop}$ \\
+(5) Opp.\ shaping  & $\sum_{j \neq i} \frac{\partial R_i}{\partial \theta_j} \frac{\partial \theta'_j}{\partial \theta_i}$ & $\lambda_n \cdot \text{OS}$ \\
+\hline
+\end{tabular}
+\end{center}
+
+Component~(4) was previously listed as ``alignment/consensus'' without
+formalization. The cooperative PG fills this gap: agents align their
+policies through lossy communication, with quality bounded by
+evidence weights.
+
+
+\section{The Six-Way Risk Decomposition --- Complete}
+
+The $\Omega$-framework decomposes multi-agent risk into six terms:
+\begin{equation}
+  R_{\text{multi}} = \underbrace{R_{W \cap \Pi_N \cap B^c} + R_{S \cap \Pi_N \cap B^c}}_{\text{learnable}}
+  + \underbrace{R_{W \cap \Pi_N \cap B} + R_{S \cap \Pi_N \cap B}}_{\text{G\"odel-limited}}
+  + \underbrace{R_{W \cap \Pi_U} + R_{S \cap \Pi_U}}_{\text{Keynes-limited}}
+\end{equation}
+
+\begin{center}
+\begin{tabular}{lll}
+\hline
+\textbf{Method} & \textbf{Terms addressed} & \textbf{Mechanism} \\
+\hline
+Standard PG     & 1--2 (learnable)     & Gradient descent \\
+EW-PG           & + 5--6 (Keynes)      & Evidence-aware weighting \\
+LOLA-PG         & + 3--4 (G\"odel, adv.)  & Infer opponent's blind spots \\
+Coop-PG         & + 3--4 (G\"odel, coop.) & Communicate own blind spots \\
+\textbf{Full $\Omega$-PG} & \textbf{All 6 terms} & \textbf{All mechanisms combined} \\
+\hline
+\end{tabular}
+\end{center}
+
+LOLA and cooperation address the G\"odel-limited terms through
+\emph{dual} mechanisms:
+\begin{itemize}
+  \item \textbf{LOLA}: Agent~$i$ \emph{infers} $G_{F_j}$ from $j$'s gradient response.
+        (Competitive G\"odelian step: I figure out what you can't see.)
+  \item \textbf{Coop}: Agent~$j$ \emph{communicates} (a lossy version of) $G_{F_j}$.
+        (Cooperative G\"odelian step: I tell you what I can see.)
+\end{itemize}
+These are independent information channels for the same G\"odelian content.
+When both are available (intra-coalition + inter-coalition dynamics),
+they provide complementary information.
+
+Only terms in $B_{\min}$ (the irreducible collective blind spot) remain
+permanently inaccessible --- as G\"odel guarantees.
+
+
+\section{The ``Vibing'' Spectrum and Evolutionary Pressure}
+
+The $\mathcal{O} \to \Pi$ mapping defines a spectrum:
+\begin{equation*}
+  \underbrace{\text{Full articulation}}_{\substack{L_{\text{self}} \approx 0 \\ \text{low } V_i \\ \text{Pearl Level 3}}}
+  \quad\longleftrightarrow\quad
+  \underbrace{\text{Pure vibing}}_{\substack{L_{\text{self}} \approx V_{\max} \\ \text{high } V_i \\ \text{Pearl Level 1}}}
+\end{equation*}
+
+The cooperative PG creates \emph{evolutionary pressure toward articulability}:
+agents that can communicate their policies contribute more to coalitions,
+receive higher coalition payoff, and are preferred as coalition partners.
+
+This is the formal version of the $\Omega$-framework's claim that
+multi-agent interaction drives agents up the causal hierarchy:
+$\text{Pearl Level 1} \to \text{Level 2} \to \text{Level 3}$.
+
+The pressure toward articulability is itself a \emph{phase transition}:
+below a critical evidence threshold, agents cannot form effective
+coalitions and are stuck in competitive dynamics. Above the threshold,
+cooperation becomes possible, creating a positive feedback loop
+(more cooperation $\to$ more shared information $\to$ better evidence
+$\to$ better communication $\to$ more cooperation).
+
+
+\section{Implications for Competitive Environments}
+
+\subsection{Dynamic Coalition Formation}
+
+In competitive games, coalitions are not fixed. At each stage, agents
+evaluate whether coalition membership improves their payoff:
+\begin{equation}
+  i \in S^*_n \iff V_{\text{comm}}(S^*_n) / |S^*_n| > V(\{i\})
+\end{equation}
+where $S^*_n$ is the optimal coalition at step~$n$.
+
+The communication quality (bounded by evidence) determines the
+\emph{stable coalition structure}: agents with similar evidence
+levels form more effective coalitions (matched communication capacity).
+
+\subsection{The Competitive-Cooperative Duality}
+
+The full gradient \eqref{eq:full-gradient} treats competition (LOLA)
+and cooperation (coop) symmetrically:
+\begin{itemize}
+  \item Against opponents: LOLA term shapes their learning trajectory.
+  \item With teammates: coop term aligns through communication.
+  \item The evidence weight $w_i$ moderates both.
+\end{itemize}
+
+An agent simultaneously cooperates within its coalition and competes
+against other coalitions. This is the generic structure of real-world
+multi-agent interaction: firms cooperate internally and compete
+externally; nations form alliances against common adversaries;
+individuals team up in games with shifting loyalties.
+
+
+\appendix
+\section{Pseudocode}\label{app:algorithms}
+
+\begin{algorithm}[H]
+\caption{Cooperative PG with Lossy Communication (Coop-PG)}\label{alg:coop-pg}
+\KwIn{Stochastic game $\mathcal{G}$, $N$ agents}
+\KwIn{Learning rates $\gamma_n$, cooperation schedule $\beta_n = \beta/(n+m)^r$}
+\KwIn{Communication channel with capacity $C$, coalition update period $T_{\text{coal}}$}
+\KwOut{Policies $\{\pi_i\}_{i=1}^N$ converging to stable Nash}
+\BlankLine
+Initialize $\pi_i \in \Pi$ for each agent $i$\;
+Initialize coalition structure $\mathcal{S} \leftarrow \{\{1\}, \{2\}, \ldots, \{N\}\}$\;
+Initialize self-models $\hat{\pi}_i \leftarrow \pi_i$ for each $i$\;
+\BlankLine
+\For{$n = 1, 2, \ldots$}{
+  \BlankLine
+  \tcp{--- Phase 1: Standard gradient and evidence estimation ---}
+  \For{$i = 1, \ldots, N$}{
+    Collect trajectory, compute $\hat{v}_{i,n}$ and $\hat{V}_{i,n}$\;
+    $w_{i,n} \leftarrow V_{\min,n} / \hat{V}_{i,n}$\;
+  }
+  \BlankLine
+  \tcp{--- Phase 2: Self-model update ($\mathcal{O} \to \Pi$) ---}
+  \For{$i = 1, \ldots, N$}{
+    Update self-model from recent behavior:\;
+    $\hat{\pi}_{i,n} \leftarrow \textsc{InferPolicy}(o_{i,1:n}, a_{i,1:n})$\;
+    \tcp{Self-knowledge loss: $L_{\text{self}}^{(i)} \leq \hat{V}_{i,n}$}
+  }
+  \BlankLine
+  \tcp{--- Phase 3: Communication within coalitions ---}
+  \For{each coalition $S \in \mathcal{S}$}{
+    \For{$i \in S$}{
+      Encode self-model: $s_i \leftarrow \textsc{Encode}(\hat{\pi}_{i,n}, C)$\;
+      Broadcast $s_i$ to coalition members\;
+    }
+    \For{$i \in S$}{
+      \For{$j \in S \setminus \{i\}$}{
+        Decode teammate's signal:\;
+        $\tilde{\pi}_{j \to i} \leftarrow \textsc{Decode}(s_j)$\;
+        \tcp{Total loss: $\leq 2 \hat{V}_{j,n} + 2 L_{\text{ch}}$}
+      }
+    }
+  }
+  \BlankLine
+  \tcp{--- Phase 4: Cooperative gradient ---}
+  \For{$i = 1, \ldots, N$}{
+    Let $S_i$ be the coalition containing $i$\;
+    \eIf{$|S_i| > 1$}{
+      Compute cooperative correction from communicated policies:\;
+      $\text{coop}_{i,n} \leftarrow \nabla_{\theta_i} \hat{R}_{S_i}(\pi_{i,n},\, \tilde{\pi}_{S_i \setminus i})$\;
+    }{
+      $\text{coop}_{i,n} \leftarrow 0$\;
+    }
+    \BlankLine
+    $\pi_{i,n+1} \leftarrow \proj_\Pi\!\bigl(\pi_{i,n} + \gamma_n \cdot w_{i,n} \cdot (\hat{v}_{i,n} + \beta_n \cdot \text{coop}_{i,n})\bigr)$\;
+  }
+  \BlankLine
+  \tcp{--- Phase 5: Coalition update (every $T_{\text{coal}}$ steps) ---}
+  \If{$n \bmod T_{\text{coal}} = 0$}{
+    \For{each pair $i, j$ in different coalitions}{
+      Estimate coalition value $\hat{V}(S_i \cup S_j)$ from recent data\;
+      \If{$\hat{V}(S_i \cup S_j) > \hat{V}(S_i) + \hat{V}(S_j)$}{
+        Merge: $\mathcal{S} \leftarrow \mathcal{S} \setminus \{S_i, S_j\} \cup \{S_i \cup S_j\}$\;
+      }
+    }
+    \For{each coalition $S$ with $|S| > 1$}{
+      \For{$i \in S$}{
+        \If{$V(\{i\}) > V(S) / |S|$}{
+          Split: agent $i$ leaves $S$\;
+        }
+      }
+    }
+  }
+}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{Full $\Omega$-PG (EW-LOLA-Coop)}\label{alg:full-omega}
+\KwIn{All inputs from EW-PG, LOLA-PG, Coop-PG}
+\KwIn{Shaping schedule $\lambda_n$, cooperation schedule $\beta_n$}
+\KwOut{Policies converging to stable Nash with all three improvements}
+\BlankLine
+Initialize policies, variances, opponent models, self-models, coalitions\;
+\BlankLine
+\For{$n = 1, 2, \ldots$}{
+  \BlankLine
+  \tcp{Compute all components}
+  $\hat{v}_{i,n},\; w_{i,n}$ for each $i$ \tcp*{EW-PG (gradient + evidence)}
+  $\text{OS}_{i,n}$ for each $i$ \tcp*{LOLA (opponent shaping)}
+  $\tilde{\pi}_{j \to i}$ for $j \in S_i$ \tcp*{Communication}
+  $\text{coop}_{i,n}$ for each $i$ \tcp*{Cooperative correction}
+  \BlankLine
+  \tcp{Full $\Omega$-update (theos eq.~27, all 5 components)}
+  \For{$i = 1, \ldots, N$}{
+    $g_{i,n} \leftarrow \hat{v}_{i,n} + \lambda_n \cdot \text{OS}_{i,n} + \beta_n \cdot \text{coop}_{i,n}$\;
+    $\pi_{i,n+1} \leftarrow \proj_\Pi\!\bigl(\pi_{i,n} + \gamma_n \cdot w_{i,n} \cdot g_{i,n}\bigr)$\;
+  }
+  \BlankLine
+  Update coalitions every $T_{\text{coal}}$ steps \tcp*{Phase 5 of Alg.~\ref{alg:coop-pg}}
+}
+\BlankLine
+\tcp{Convergence guarantees (Theorem~\ref{thm:full}):}
+\tcp{$\quad \E[\|\pi_n - \pi^*\|^2] = O\bigl(\frac{\HM(V)}{\AM(V)} \cdot C_{\text{std}}\, /\, n^q\bigr)$}
+\tcp{$\quad \mu_{\text{full}} = \mu + \lambda \mu_H + \beta \mu_C$}
+\end{algorithm}
+
+\begin{remark}[Implementation notes]
+\begin{enumerate}
+  \item \textsc{InferPolicy} reconstructs $\hat{\pi}_i$ from observation-action
+    history. Options: (a)~frequency counts (tabular), (b)~behavioral cloning
+    network trained on own $(s,a)$ pairs, (c)~inverse RL.
+  \item \textsc{Encode}/\textsc{Decode} implement lossy compression of the
+    self-model. For continuous policies: quantize and transmit parameters.
+    For tabular: transmit action distributions with precision $\propto C$.
+  \item Coalition updates (Phase~5) are expensive. The period $T_{\text{coal}}$
+    should be large enough for value estimates to stabilize (e.g., 100--1000 steps).
+  \item In competitive games, coalitions are temporary. An agent defects when
+    its individual value exceeds its per-capita coalition share.
+    The split check (Phase~5) handles this.
+  \item The self-knowledge loss $L_{\text{self}}^{(i)} \leq \hat{V}_{i,n}$
+    is monitored but not explicitly minimized. It decreases naturally as
+    the agent gathers more evidence. To accelerate: add an intrinsic reward
+    for self-model accuracy (curiosity about own policy).
+\end{enumerate}
+\end{remark}
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

@@ -6,6 +6,7 @@
 \usepackage{enumerate}
 \usepackage{hyperref}
 \usepackage{cleveref}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
 
 \newtheorem{theorem}{Theorem}[section]
 \newtheorem{lemma}[theorem]{Lemma}
@@ -445,5 +446,90 @@ E.~Calvano, G.~Calzolari, V.~Denicol{\`o}, and S.~Pastorello.
 \newblock \emph{American Economic Review}, 110(10):3267--3297, 2020.
 
 \end{thebibliography}
+
+
+\appendix
+\section{Pseudocode}\label{app:algorithms}
+
+\begin{algorithm}[H]
+\caption{Opponent-Shaping Policy Gradient (LOLA-PG)}\label{alg:lola-pg}
+\KwIn{Stochastic game $\mathcal{G}$, $N$ agents}
+\KwIn{Learning rates $\gamma_n = \gamma/(n+m)^p$, shaping schedule $\lambda_n = \lambda/(n+m)^r$}
+\KwIn{Opponent model learning rate $\eta > 0$}
+\KwOut{Policies $\{\pi_i\}_{i=1}^N$ converging to stable Nash}
+\BlankLine
+Initialize $\pi_i \in \Pi$ for each agent $i$\;
+Initialize opponent models $\hat{\pi}_{j|i}$ for each pair $i \neq j$\;
+\BlankLine
+\For{$n = 1, 2, \ldots$}{
+  \BlankLine
+  \tcp{--- Phase 1: Standard gradient estimation ---}
+  \For{$i = 1, \ldots, N$}{
+    Collect trajectory, compute $\hat{v}_{i,n}$ (REINFORCE or backprop)\;
+  }
+  \BlankLine
+  \tcp{--- Phase 2: Opponent modeling ---}
+  \For{$i = 1, \ldots, N$}{
+    \For{$j \neq i$}{
+      Update opponent model from observed actions:\;
+      $\hat{\pi}_{j|i} \leftarrow \hat{\pi}_{j|i} + \eta \cdot \nabla \log \hat{\pi}_{j|i}(a_j | s)$\;
+      \BlankLine
+      Anticipate $j$'s next update (first-order Taylor):\;
+      $\theta'_j \leftarrow \theta_j - \gamma_n \cdot \nabla_{\theta_j} \hat{R}_j$\;
+    }
+  }
+  \BlankLine
+  \tcp{--- Phase 3: Opponent-shaping term ---}
+  \For{$i = 1, \ldots, N$}{
+    Compute LOLA correction:\;
+    $\text{OS}_{i,n} \leftarrow \sum_{j \neq i} \frac{\partial \hat{R}_i}{\partial \theta_j} \cdot \frac{\partial \theta'_j}{\partial \theta_i}$\;
+    \BlankLine
+    \tcp{Requires: $\nabla_{\theta_j} R_i$ (cross-derivative) and}
+    \tcp{$\partial \theta'_j / \partial \theta_i = -\gamma_n \nabla^2_{\theta_j \theta_i} R_j$ (Hessian)}
+  }
+  \BlankLine
+  \tcp{--- Phase 4: Combined update ---}
+  \For{$i = 1, \ldots, N$}{
+    $\pi_{i,n+1} \leftarrow \proj_\Pi\!\bigl(\pi_{i,n} + \gamma_n \cdot (\hat{v}_{i,n} + \lambda_n \cdot \text{OS}_{i,n})\bigr)$\;
+  }
+}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{Evidence-Weighted LOLA-PG (EW-LOLA-PG)}\label{alg:ew-lola}
+\KwIn{All inputs from Algorithms~\ref{alg:ewpg} and~\ref{alg:lola-pg}}
+\KwOut{Policies converging to stable Nash with improved variance and enlarged basin}
+\BlankLine
+Initialize policies, variance estimates, opponent models\;
+\BlankLine
+\For{$n = 1, 2, \ldots$}{
+  Compute $\hat{v}_{i,n}$ for each $i$ \tcp*{Phase 1 of Alg.~\ref{alg:ewpg}}
+  Compute $\hat{V}_{i,n}$, $w_{i,n}$ for each $i$ \tcp*{Phase 2 of Alg.~\ref{alg:ewpg}}
+  Compute $\text{OS}_{i,n}$ for each $i$ \tcp*{Phases 2--3 of Alg.~\ref{alg:lola-pg}}
+  \BlankLine
+  \For{$i = 1, \ldots, N$}{
+    $\pi_{i,n+1} \leftarrow \proj_\Pi\!\bigl(\pi_{i,n} + \gamma_n \cdot w_{i,n} \cdot (\hat{v}_{i,n} + \lambda_n \cdot \text{OS}_{i,n})\bigr)$\;
+  }
+}
+\end{algorithm}
+
+\begin{remark}[Implementation notes]
+\begin{enumerate}
+  \item The opponent-shaping term requires the cross-derivative
+    $\partial R_i / \partial \theta_j$ and the Hessian
+    $\nabla^2_{\theta_j \theta_i} R_j$. In practice, these are estimated
+    via finite differences or automatic differentiation through the
+    opponent's anticipated update.
+  \item For the annealed schedule ($\lambda_n \to 0$), choosing
+    $r = p$ (same decay as $\gamma_n$) always satisfies the compatibility
+    condition $r > 1 - p$ (Theorem~4.2).
+  \item The constant-$\lambda$ variant (Algorithm~\ref{alg:lola-pg} with
+    fixed $\lambda_n = \lambda$) is simpler to implement but converges
+    to an $O(\lambda)$-neighborhood of Nash rather than to Nash itself.
+    Use when the enlarged basin matters more than exact convergence.
+  \item Opponent models $\hat{\pi}_{j|i}$ can be neural networks trained
+    on observed $(s, a_j)$ pairs. For tabular games, frequency counts suffice.
+\end{enumerate}
+\end{remark}
 
 \end{document}

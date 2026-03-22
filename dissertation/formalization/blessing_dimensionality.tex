@@ -1,0 +1,582 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{enumerate}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+
+\DeclareMathOperator{\proj}{proj}
+\DeclareMathOperator{\AM}{AM}
+\DeclareMathOperator{\HM}{HM}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator{\rank}{rank}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\ip}[2]{\langle #1, #2 \rangle}
+\newcommand{\norm}[1]{\|#1\|}
+
+\title{The Blessing of Dimensionality for Policy Gradients:\\
+Sparse Recovery, Evidence Weighting, and the\\
+Logarithmic Cost of Action Space Expansion}
+\author{Eugene Shcherbinin}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The REINFORCE gradient estimator suffers from variance that appears to
+scale linearly with the action space dimension $d = |\mathcal{A}|$. We show
+this is a curse of dimensionality illusion: when the optimal policy is
+$k$-sparse (concentrates on $k \ll d$ actions), high-dimensional concentration
+phenomena reduce the effective sample complexity to $O(k \log(d/k))$ ---
+\emph{sub-linear} in~$d$. We formalize this through three mechanisms:
+(1)~measure concentration bounds showing gradient noise self-averages
+across irrelevant action dimensions; (2)~compressed sensing theory giving
+sparse gradient recovery guarantees; (3)~an effective-dimension refinement
+of the evidence weight from the $\Omega$-framework that captures the true
+information content of the agent's experience. Combined with L1 policy
+regularization, this yields a natural curriculum: start sparse (low
+variance, fast convergence), expand as evidence improves (logarithmic
+cost). The blessing of dimensionality transforms the action space expansion
+problem from multiplicative to logarithmic.
+\end{abstract}
+
+
+\section{The Variance Problem in Large Action Spaces}
+
+\subsection{REINFORCE and the Apparent Curse}
+
+The REINFORCE gradient estimator for a policy $\pi_\theta$ over
+action space $\mathcal{A}$ with $|\mathcal{A}| = d$ is:
+\begin{equation}\label{eq:reinforce}
+  \hat{g}(\tau) = R(\tau) \cdot \nabla_\theta \log \pi_\theta(\tau)
+  \in \R^d.
+\end{equation}
+The variance of this estimator decomposes by action:
+\begin{equation}\label{eq:variance-decomp}
+  \text{Var}(\hat{g}) = \sum_{a=1}^{d}
+    \underbrace{\pi(a)}_{\text{sampling prob.}} \cdot
+    \underbrace{\left(\frac{\nabla_\theta \pi(a)}{\pi(a)}\right)^2}_{\text{score}^2} \cdot
+    \underbrace{R(a)^2}_{\text{reward}^2}
+    \;-\; \norm{\nabla J}^2.
+\end{equation}
+
+For a low-probability action $a$ with $\pi(a) = \epsilon \to 0$:
+\begin{equation}
+  \text{contribution}_a \;\propto\; \frac{R(a)^2}{\pi(a)} \;\to\; \infty.
+\end{equation}
+
+This is the \textbf{inverse probability weighting} problem: rare actions
+contribute enormous variance spikes when sampled. Expanding $\mathcal{A}$
+by adding many low-probability actions appears to make this sum diverge.
+
+\textbf{The apparent conclusion}: variance scales as $\Theta(d)$, so
+REINFORCE is impractical for large action spaces.
+
+\textbf{We show this conclusion is wrong} when the optimal policy is sparse.
+
+
+\subsection{The Overfitting Analogy}
+
+The parallel to classical ML overfitting is precise:
+
+\begin{center}
+\begin{tabular}{lll}
+\hline
+& \textbf{Supervised learning} & \textbf{Policy gradient} \\
+\hline
+Space     & Parameter space $\R^d$ & Action space $\mathcal{A}$, $|\mathcal{A}| = d$ \\
+Problem   & Too many params vs.\ data & Too many actions vs.\ samples \\
+Noise     & Fitting noise in labels & Gradient spikes from rare actions \\
+Signal    & True function (low-dim) & True gradient (sparse) \\
+Cure      & L1/Lasso (sparsity) & L1 on policy (action sparsity) \\
+Blessing  & Compressed sensing & Sparse gradient recovery \\
+\hline
+\end{tabular}
+\end{center}
+
+The key insight from compressed sensing: \emph{sparsity makes
+high-dimensional problems easier, not harder.}
+
+
+\section{The Blessing: Concentration and Sparse Recovery}
+
+\subsection{Concentration of the Gradient Vector}
+
+\begin{theorem}[Gradient concentration in high dimensions]\label{thm:concentration}
+Let $\hat{g}_1, \ldots, \hat{g}_M$ be i.i.d.\ REINFORCE gradient samples
+in $\R^d$. Suppose the gradient covariance $\Sigma = \text{Cov}(\hat{g})$
+has eigenvalues $\lambda_1 \geq \cdots \geq \lambda_d$. Then:
+\begin{equation}\label{eq:concentration}
+  \Prob\!\left(\left\|\frac{1}{M}\sum_{m=1}^M \hat{g}_m - \nabla J\right\|
+  \leq \epsilon\right) \geq 1 - \delta
+\end{equation}
+provided $M \geq C \cdot \frac{\tr(\Sigma)}{\epsilon^2} \cdot \log(d/\delta)$,
+where $C$ is a universal constant.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Apply the matrix Bernstein inequality to the sum of centered random
+vectors $\hat{g}_m - \nabla J$. The key quantity is $\tr(\Sigma)$
+(not $d \cdot \lambda_{\max}$) because the noise contributions from
+different eigenspaces are independent and add their variances, not
+their maxima.
+\end{proof}
+
+\begin{remark}[Why $\tr(\Sigma)$, not $d \cdot \sigma^2$]
+The naive bound treats all $d$ dimensions equally:
+$M \geq d \cdot \sigma^2_{\max} / \epsilon^2$.
+But $\tr(\Sigma) = \sum_i \lambda_i$ can be \emph{much} smaller than
+$d \cdot \lambda_1$ when the eigenspectrum decays. This is the first
+blessing: gradient variance concentrates on a low-dimensional subspace.
+\end{remark}
+
+
+\subsection{Effective Dimension}
+
+\begin{definition}[Effective dimension of the gradient]\label{def:deff}
+The effective dimension of the policy gradient at $\pi_\theta$ is:
+\begin{equation}\label{eq:deff}
+  d_{\text{eff}} \;=\; \frac{\tr(\Sigma)}{\lambda_{\max}(\Sigma)}
+  \;=\; \frac{\sum_{i=1}^d \lambda_i}{\lambda_1}.
+\end{equation}
+\end{definition}
+
+This measures how many eigenvalues contribute meaningfully.
+If only $k$ eigenvalues are large and the rest are negligible:
+$d_{\text{eff}} \approx k$. The sample complexity
+(\cref{thm:concentration}) becomes:
+\begin{equation}
+  M \;\geq\; C \cdot \frac{d_{\text{eff}} \cdot \lambda_1}{\epsilon^2}
+  \cdot \log(d/\delta)
+  \;\approx\; O\!\left(\frac{k}{\epsilon^2} \log d\right).
+\end{equation}
+
+\textbf{This is sub-linear in $d$.} Adding 10,000 low-probability actions
+to a 10-action game costs an extra $\log(10000/10) \approx 7$ factor,
+not a $1000\times$ factor.
+
+
+\subsection{Sparse Policy Recovery via Compressed Sensing}
+
+When the optimal policy $\pi^*$ is $k$-sparse (at most $k$ actions
+have positive probability in each state), compressed sensing theory
+gives sharp guarantees.
+
+\begin{theorem}[Sparse gradient recovery]\label{thm:cs}
+Let $\pi^*$ be $k$-sparse. Under the restricted isometry property
+(RIP) on the gradient measurement matrix, the true gradient direction
+can be recovered from $M$ REINFORCE samples with:
+\begin{equation}\label{eq:cs-bound}
+  \norm{\hat{\nabla} J - \nabla J} \leq C_1 \cdot \frac{\sigma_k(\nabla J)_1}{\sqrt{k}}
+  + C_2 \cdot \frac{\epsilon}{\sqrt{M}}
+\end{equation}
+where $\sigma_k(\nabla J)_1$ is the $\ell_1$ error of the best
+$k$-sparse approximation, provided:
+\begin{equation}
+  M \;\geq\; C \cdot k \log(d/k).
+\end{equation}
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+The REINFORCE samples $\hat{g}_m$ are random linear measurements of
+$\nabla J$ corrupted by noise. When $\pi^*$ is $k$-sparse, $\nabla J$
+is approximately $k$-sparse (gradient is zero in directions corresponding
+to zero-probability actions). Apply the Cand\`es--Tao RIP theory to the
+measurement ensemble.
+\end{proof}
+
+\begin{remark}[The $k \log(d/k)$ scaling]
+This is the compressed sensing miracle: you need samples proportional
+to the sparsity $k$, not the ambient dimension $d$. The $\log(d/k)$
+factor is the information-theoretic price of not knowing \emph{which}
+$k$ actions are relevant.
+\end{remark}
+
+
+\subsection{Johnson--Lindenstrauss for Gradient Updates}
+
+\begin{proposition}[Random projection preserves gradient structure]\label{prop:jl}
+Let $\Phi \in \R^{m \times d}$ be a random Gaussian matrix with
+$m = O(k \log d / \epsilon^2)$. Then with high probability, for all
+$k$-sparse gradient vectors $g, g'$:
+\begin{equation}
+  (1 - \epsilon)\norm{g - g'} \leq \norm{\Phi g - \Phi g'} \leq (1 + \epsilon)\norm{g - g'}.
+\end{equation}
+\end{proposition}
+
+\textbf{Implementation}: Project $\hat{g}_m \in \R^d$ to
+$\tilde{g}_m = \Phi \hat{g}_m \in \R^m$, average in the low-dimensional
+space, then recover via sparse recovery (L1 minimization / LASSO).
+This reduces the per-step computational cost from $O(d)$ to $O(m) = O(k \log d)$.
+
+
+\section{Evidence Weighting with Effective Dimension}
+
+\subsection{Refined Evidence Weight}
+
+The EW-PG framework (companion paper) uses the evidence weight:
+\begin{equation}
+  w_i = \frac{V_{\min}}{V_i}, \qquad V_i = \text{Var}(\hat{g}_i).
+\end{equation}
+
+This treats the variance as a scalar, summing over all $d$ dimensions.
+But the blessing of dimensionality reveals that most of this variance
+is irrelevant noise in unused action dimensions.
+
+\begin{definition}[Effective evidence weight]\label{def:eff-evidence}
+The effective evidence weight refines $V_i$ using the gradient's
+effective dimension:
+\begin{equation}\label{eq:eff-weight}
+  V_i^{\text{eff}} = \frac{d_{\text{eff},i}}{d} \cdot V_i,
+  \qquad
+  w_i^{\text{eff}} = \frac{V_{\min}^{\text{eff}}}{V_i^{\text{eff}}}.
+\end{equation}
+\end{definition}
+
+\begin{theorem}[Effective evidence improvement]\label{thm:eff-evidence}
+For an agent with $k$-sparse optimal policy in a $d$-action game:
+\begin{equation}
+  \frac{w_i^{\text{eff}}}{w_i} \;=\; \frac{d}{d_{\text{eff},i}} \;\geq\; \frac{d}{k}.
+\end{equation}
+The effective evidence weight is a factor of $d/k$ larger than the
+ambient weight. For $d = 10{,}000$, $k = 5$: the effective weight
+is $2{,}000\times$ larger.
+\end{theorem}
+
+\begin{remark}[What this means]
+An agent in a 10,000-action game with a 5-sparse policy has been
+\emph{systematically underweighted} by the ambient evidence measure.
+Most of its ``variance'' is noise in action dimensions it will never use.
+The effective weight corrects this, allowing the agent to take larger
+steps and converge faster.
+\end{remark}
+
+
+\subsection{Estimating Effective Dimension}
+
+\begin{algorithm}[H]
+\caption{Effective Dimension Estimation}\label{alg:deff}
+\KwIn{Gradient samples $\hat{g}_1, \ldots, \hat{g}_M \in \R^d$}
+\KwIn{Threshold $\tau \in (0, 1)$ (e.g., $\tau = 0.95$)}
+\KwOut{Effective dimension $\hat{d}_{\text{eff}}$}
+\BlankLine
+Compute sample covariance $\hat{\Sigma} = \frac{1}{M}\sum_m (\hat{g}_m - \bar{g})(\hat{g}_m - \bar{g})^\top$\;
+\BlankLine
+\tcp{Option A: Ratio estimator (cheap, $O(Md)$)}
+$\hat{d}_{\text{eff}} \leftarrow \tr(\hat{\Sigma}) / \lambda_{\max}(\hat{\Sigma})$\;
+\tcp{$\lambda_{\max}$ via power iteration, $O(Md)$}
+\BlankLine
+\tcp{Option B: Eigenvalue counting (precise, $O(d^2 M + d^3)$)}
+Compute eigenvalues $\hat{\lambda}_1 \geq \cdots \geq \hat{\lambda}_d$\;
+$\hat{d}_{\text{eff}} \leftarrow \min\{k : \sum_{i=1}^k \hat{\lambda}_i \geq \tau \cdot \tr(\hat{\Sigma})\}$\;
+\BlankLine
+\tcp{Option C: Random projection (scalable, $O(Mm)$)}
+Project: $\tilde{g}_m = \Phi \hat{g}_m$ with $\Phi \in \R^{m \times d}$, $m \ll d$\;
+$\hat{d}_{\text{eff}} \leftarrow \tr(\tilde{\Sigma}) / \lambda_{\max}(\tilde{\Sigma})$ in the projected space\;
+\end{algorithm}
+
+
+\section{L1-Regularized Evidence-Weighted PG}
+
+\subsection{The Sparse EW-PG Update}
+
+Combining L1 regularization (for sparsity) with evidence weighting
+(for adaptive step sizes) and the effective dimension (for accurate evidence):
+
+\begin{algorithm}[H]
+\caption{Sparse Evidence-Weighted PG (Sparse-EW-PG)}\label{alg:sparse-ewpg}
+\KwIn{Game $\mathcal{G}$, $N$ agents, $|\mathcal{A}_i| = d_i$}
+\KwIn{Learning rates $\gamma_n$, L1 coefficient $\mu > 0$}
+\KwIn{Sparsity relaxation schedule $\mu_n = \mu / (1 + n/n_0)$}
+\KwOut{Sparse policies converging to Nash}
+\BlankLine
+Initialize $\pi_i \in \Pi$ for each agent\;
+\BlankLine
+\For{$n = 1, 2, \ldots$}{
+  \BlankLine
+  \tcp{--- Gradient and evidence ---}
+  \For{$i = 1, \ldots, N$}{
+    Compute $\hat{v}_{i,n}$ (REINFORCE)\;
+    Update gradient covariance estimate $\hat{\Sigma}_{i,n}$\;
+    Estimate effective dimension $d_{\text{eff},i,n}$ (Algorithm~\ref{alg:deff})\;
+    \BlankLine
+    Compute effective evidence weight:\;
+    $V_{i,n}^{\text{eff}} \leftarrow (d_{\text{eff},i,n} / d_i) \cdot \hat{V}_{i,n}$\;
+    $w_{i,n}^{\text{eff}} \leftarrow V_{\min,n}^{\text{eff}} / V_{i,n}^{\text{eff}}$\;
+  }
+  \BlankLine
+  \tcp{--- Sparse update with proximal step ---}
+  \For{$i = 1, \ldots, N$}{
+    Gradient step:\;
+    $\tilde{\pi}_{i} \leftarrow \pi_{i,n} + \gamma_n \cdot w_{i,n}^{\text{eff}} \cdot \hat{v}_{i,n}$\;
+    \BlankLine
+    L1 proximal step (soft-thresholding):\;
+    \For{each action $a$}{
+      $\tilde{\pi}_i(a) \leftarrow \text{sign}(\tilde{\pi}_i(a)) \cdot \max(|\tilde{\pi}_i(a)| - \gamma_n \mu_n, \; 0)$\;
+    }
+    \BlankLine
+    Project back to simplex:\;
+    $\pi_{i,n+1} \leftarrow \proj_{\Delta}(\tilde{\pi}_i)$\;
+  }
+  \BlankLine
+  \tcp{--- Adaptive sparsity relaxation ---}
+  \tcp{As evidence improves, relax L1 to allow exploration}
+  \tcp{$\mu_n$ decreases: start sparse, expand action support}
+}
+\end{algorithm}
+
+\subsection{The Natural Curriculum}
+
+The interaction between L1 regularization and evidence weighting creates
+a \textbf{self-organizing curriculum}:
+
+\begin{enumerate}
+  \item \textbf{Early training} ($n$ small, $\mu_n$ large, $V_i$ high):
+    \begin{itemize}
+      \item L1 drives policy toward extreme sparsity ($k \approx 1$--$2$)
+      \item $d_{\text{eff}} \approx k \ll d$ → effective evidence is high
+      \item High $w_i^{\text{eff}}$ → large steps → fast convergence to sparse optimum
+    \end{itemize}
+
+  \item \textbf{Mid training} ($\mu_n$ decreasing, $V_i$ decreasing):
+    \begin{itemize}
+      \item L1 relaxes → policy support grows ($k$ increases)
+      \item But evidence is improving (more data) → $V_i$ decreases
+      \item Net effect: $d_{\text{eff}}$ grows but $V_i^{\text{eff}}$ stays controlled
+      \item Agent explores new actions with calibrated confidence
+    \end{itemize}
+
+  \item \textbf{Late training} ($\mu_n \approx 0$, $V_i$ small):
+    \begin{itemize}
+      \item No sparsity constraint → full action support available
+      \item High evidence → agent knows its policy well
+      \item Converges to true (possibly dense) Nash equilibrium
+    \end{itemize}
+\end{enumerate}
+
+\begin{remark}[Comparison with entropy regularization]
+Standard entropy regularization $-\beta H(\pi)$ encourages \emph{uniform}
+exploration (spread mass). L1 encourages \emph{focused} exploration
+(concentrate mass). In high dimensions, L1 is strictly better:
+\begin{itemize}
+  \item Entropy: $d_{\text{eff}} \approx d$ (all dimensions active) → no blessing
+  \item L1: $d_{\text{eff}} \approx k$ → full blessing of dimensionality
+\end{itemize}
+This is why entropy regularization helps with exploration but
+\emph{does not} address the variance problem, while L1 addresses both.
+\end{remark}
+
+
+\section{Convergence Analysis}
+
+\subsection{Main Result}
+
+\begin{theorem}[Convergence of Sparse-EW-PG]\label{thm:main}
+Let $\pi^*$ be a $k$-sparse stable Nash policy in a stochastic game
+with $|\mathcal{A}| = d$. Under the SOS condition with parameter $\mu$,
+and with:
+\begin{itemize}
+  \item $\gamma_n = \gamma/(n+m)^p$, $p \in (1/2, 1]$
+  \item $\mu_n = \mu_0 / (1 + n/n_0)$ (L1 annealing)
+  \item Evidence weights computed with effective dimension
+\end{itemize}
+the Sparse-EW-PG iterates satisfy:
+\begin{equation}\label{eq:main-result}
+  \E[\norm{\pi_n - \pi^*}^2] \;=\; O\!\left(
+    \frac{\HM(V^{\text{eff}})}{\AM(V^{\text{eff}})} \cdot
+    \frac{C_k}{n^q}
+  \right)
+\end{equation}
+where $C_k = O(k \log(d/k))$ is the \emph{sparse constant},
+sub-linear in~$d$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Three steps:
+\begin{enumerate}
+  \item The L1 proximal step ensures $\pi_n$ stays approximately
+    $k$-sparse for all~$n$ (up to the annealing schedule). Standard
+    proximal gradient convergence gives $\norm{\pi_n - \pi^*_k}_1 \to 0$
+    where $\pi^*_k$ is the best $k$-sparse approximation to $\pi^*$.
+
+  \item With $k$-sparse iterates, the effective dimension satisfies
+    $d_{\text{eff},n} \leq 2k$ (the gradient covariance has at most
+    $2k$ significant eigenvalues --- $k$ from the policy support
+    and $k$ from the exploration directions).
+
+  \item Apply the EW-PG convergence theorem with effective variance:
+    $V^{\text{eff}} = (d_{\text{eff}}/d) \cdot V$.
+    The constant $C_k$ arises from \cref{thm:cs}: the sparse recovery
+    bound replaces the ambient-dimension bound.
+\end{enumerate}
+\end{proof}
+
+\subsection{Comparison of Sample Complexities}
+
+\begin{center}
+\begin{tabular}{lccc}
+\hline
+\textbf{Method} & \textbf{Samples to $\epsilon$-Nash} & \textbf{Scaling in $d$} & \textbf{Scaling in $k$} \\
+\hline
+Standard PG             & $O(d^2 / \epsilon^2)$                & $d^2$ (quadratic)     & --- \\
+PG + entropy reg.       & $O(d / \epsilon^2)$                  & $d$ (linear)          & --- \\
+PG + L1 reg.            & $O(k \log(d/k) / \epsilon^2)$        & $\log d$ (logarithmic) & $k$ (linear) \\
+EW-PG + L1 (ours)       & $O(\frac{\HM}{\AM} k \log(d/k) / \epsilon^2)$ & $\log d$ & $k \cdot \frac{\HM}{\AM}$ \\
+\hline
+\end{tabular}
+\end{center}
+
+The combined method achieves \emph{logarithmic} scaling in the action space
+dimension and an additional $\HM/\AM \leq 1$ improvement from evidence weighting.
+
+
+\section{The Communication Connection}
+
+\subsection{Sparse Policies Are Communicable}
+
+The cooperative PG (companion paper) shows that communication quality
+is bounded by self-knowledge, which is bounded by evidence. The
+blessing of dimensionality adds a crucial refinement:
+\emph{sparse policies are inherently more communicable}.
+
+To communicate a $k$-sparse policy over a $d$-action space:
+\begin{itemize}
+  \item Naive: transmit $d$ probabilities → rate $O(d)$
+  \item Sparse: transmit $k$ (action, probability) pairs → rate $O(k \log d)$
+\end{itemize}
+
+The $\log d$ factor (identifying which actions) replaces the $d$ factor
+(transmitting all probabilities). This means:
+
+\begin{corollary}[Sparsity enables coalition formation]
+In a game with $|\mathcal{A}| = d$ and $k$-sparse optimal policies,
+the communication bandwidth required for effective coalition coordination
+scales as $O(k \log d)$, not $O(d)$. The self-knowledge bottleneck
+(\S2 of Cooperative PG) is relaxed by a factor of $d / (k \log d)$.
+\end{corollary}
+
+\subsection{Vibing Is Dense; Articulation Is Sparse}
+
+The ``vibing'' spectrum from the cooperative paper acquires a precise meaning:
+\begin{itemize}
+  \item \textbf{Vibing agent}: policy is effectively dense (spreading mass
+    over many actions through imprecise habits). $d_{\text{eff}} \approx d$.
+    Poor self-knowledge, poor communication.
+  \item \textbf{Articulate agent}: policy is sparse (concentrating on the
+    actions that matter). $d_{\text{eff}} \approx k \ll d$.
+    Good self-knowledge, good communication.
+\end{itemize}
+
+L1 regularization drives the agent from vibing toward articulation.
+The blessing of dimensionality ensures this transition is
+\emph{computationally cheap} in the action space dimension.
+
+
+\section{Connection to the $\Omega$-Framework}
+
+\subsection{The Embedding Space Interpretation}
+
+In the $\Omega$-framework (theos \S I), each agent's observation space
+$\mathcal{O}$ is embedded in a high-dimensional space where the blessing
+of dimensionality operates. The manuscript (Chapter~9) describes this
+as ``Maximus the Confessor's logoi --- every entity has a position in
+semantic space,'' and notes that ``in high dimensions, structure becomes
+MORE visible, not less.''
+
+The policy gradient result makes this precise:
+\begin{itemize}
+  \item The policy $\pi \in \R^d$ lives in a high-dimensional space
+  \item The \emph{effective} policy lives on a $k$-dimensional submanifold
+  \item The gradient concentrates on this submanifold (blessing)
+  \item The evidence weight measures information content on the submanifold
+  \item Sparse recovery lets us find the submanifold from few samples
+\end{itemize}
+
+This is the ``blessing of dimensionality'' from Chapter~9 of the
+theological manuscript, now formalized as a convergence guarantee.
+
+\subsection{Pearl's Hierarchy and Sparse Representations}
+
+At Pearl Level 1 (association), the agent observes correlations across
+all $d$ actions --- a dense, high-variance representation. At Pearl
+Level 3 (counterfactual), the agent has identified the $k$ \emph{causal}
+actions --- a sparse, low-variance representation.
+
+The progression up Pearl's hierarchy IS the sparsification process:
+\begin{center}
+Level 1: dense policy ($d_{\text{eff}} \approx d$, high $V$, ``vibing'') \\
+$\downarrow$ \quad {\small L1 regularization + evidence accumulation} \\
+Level 3: sparse policy ($d_{\text{eff}} \approx k$, low $V^{\text{eff}}$, ``articulate'')
+\end{center}
+
+The L1 coefficient $\mu_n$ controls the speed of this ascent.
+
+
+\section{Numerical Illustration}
+
+\subsection{Expected Behavior}
+
+For a game with $|\mathcal{A}| = 1000$ and $k = 5$ optimal actions:
+
+\begin{center}
+\begin{tabular}{lccc}
+\hline
+\textbf{Phase} & $d_{\text{eff}}$ & $V^{\text{eff}} / V$ & \textbf{Effective samples} \\
+\hline
+Early ($n < 100$)     & $\sim$3--5   & $\sim$0.5\%   & $200\times$ more informative \\
+Mid ($100 < n < 1000$) & $\sim$5--15  & $\sim$1.5\%  & $65\times$ more informative \\
+Late ($n > 1000$)     & $\sim$5--30  & $\sim$3\%     & $33\times$ more informative \\
+\hline
+\end{tabular}
+\end{center}
+
+The ``effective samples'' column shows how much more informative each
+sample is compared to the ambient-dimension estimate. Even in the late
+phase, the effective dimension is $30 \ll 1000$, giving a $33\times$
+efficiency gain from the blessing of dimensionality alone.
+
+\appendix
+\section{Background: Key Results from High-Dimensional Statistics}
+
+For reference, the main results we invoke:
+
+\begin{theorem}[Matrix Bernstein inequality, Tropp 2012]
+Let $X_1, \ldots, X_M$ be independent random matrices with $\E[X_m] = 0$
+and $\norm{X_m} \leq L$. Then:
+\[
+  \Prob\!\left(\left\|\sum_m X_m\right\| \geq t\right)
+  \leq (d_1 + d_2) \exp\!\left(\frac{-t^2/2}{\sigma^2 + Lt/3}\right)
+\]
+where $\sigma^2 = \max(\norm{\sum \E[X_m X_m^\top]}, \norm{\sum \E[X_m^\top X_m]})$.
+\end{theorem}
+
+\begin{theorem}[Cand\`es--Tao RIP, 2005]
+Let $\Phi \in \R^{M \times d}$ satisfy the restricted isometry property
+of order $2k$: for all $2k$-sparse $x$,
+$(1-\delta_{2k})\norm{x}^2 \leq \norm{\Phi x}^2 \leq (1+\delta_{2k})\norm{x}^2$.
+If $\delta_{2k} < \sqrt{2} - 1$, then $\ell_1$ minimization recovers
+any $k$-sparse signal exactly from $M = O(k \log(d/k))$ measurements.
+\end{theorem}
+
+\begin{theorem}[Johnson--Lindenstrauss, 1984]
+For any $\epsilon > 0$ and $n$ points in $\R^d$, there exists a linear
+map $\Phi : \R^d \to \R^m$ with $m = O(\log n / \epsilon^2)$ preserving
+all pairwise distances within factor $(1 \pm \epsilon)$.
+\end{theorem}
+
+
+\end{document}
