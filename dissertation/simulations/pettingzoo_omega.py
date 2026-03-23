@@ -208,9 +208,12 @@ def run_omega_pg(game: Game, config: OmegaConfig, n_episodes: int = 3000,
     # Phase 0: FP-NE pre-search (if enabled)
     init_strategy = None
     if config.use_fp_search:
+        # Scale tau with payoff magnitude for proper contraction
+        M = max(np.abs(game.R1).max(), np.abs(game.R2).max())
+        tau = max(0.05, M * 0.5)  # ensure reasonable contraction
         search = bayesian_fp_search(game, max_searches=config.fp_search_budget,
                                      confidence_threshold=config.fp_confidence,
-                                     verbose=False)
+                                     tau=tau, verbose=False)
         if search['counter'].n_discovered > 0:
             best = max(search['counter'].discovered_ne, key=lambda x: x[2] + x[3])
             init_strategy = (best[0], best[1])

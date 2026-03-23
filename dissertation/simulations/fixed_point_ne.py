@@ -432,7 +432,7 @@ def bayesian_fp_search(game: Game, max_searches: int = 200,
 
     for s in range(max_searches):
         # Alternate between random starts and perturbations of best known
-        if s < 10 or np.random.rand() < 0.4:
+        if s < 10 or np.random.rand() < 0.4 or counter.n_discovered == 0:
             # Random exploration
             init = None
         else:
