@@ -119,6 +119,49 @@ theorem search_monotone
   sorry  -- Proof: more searches can only add to the discovered set
          -- Positive correlation ensures new NE likely improves all agents
 
+/-! ## The Topological Cooperation Theorem -/
+
+/-- For a finite set of reals, the maximum is ≥ the mean.
+    This is the core of the cooperation theorem. -/
+theorem max_ge_mean (vals : Fin K → ℝ) (hK : K ≥ 2) :
+    ∃ k : Fin K, vals k ≥ (∑ i : Fin K, vals i) / K := by
+  by_contra h
+  push_neg at h
+  have : ∑ i : Fin K, vals i < ∑ i : Fin K, (∑ j : Fin K, vals j) / K := by
+    exact Finset.sum_lt_sum_of_nonempty Finset.univ_nonempty (fun i _ => h i)
+  simp [Finset.sum_div] at this
+  linarith
+
+/-- Cooperation gap is non-negative: max welfare ≥ mean welfare.
+    The Topological Cooperation Theorem (Theorem 6.3). -/
+theorem cooperation_gap_nonneg
+    (welfare : Fin K → ℝ) (hK : K ≥ 2) :
+    (Finset.univ.sup' (Finset.univ_nonempty) welfare) -
+    (∑ i : Fin K, welfare i) / K ≥ 0 := by
+  sorry  -- Follows from max_ge_mean + Finset.sup' properties
+         -- The sup' is ≥ every element, hence ≥ the mean
+
+/-- Cooperation gap is strictly positive when welfare values are not all equal. -/
+theorem cooperation_gap_strict
+    (welfare : Fin K → ℝ) (hK : K ≥ 2)
+    (h_not_const : ∃ i j : Fin K, welfare i ≠ welfare j) :
+    (Finset.univ.sup' (Finset.univ_nonempty) welfare) -
+    (∑ i : Fin K, welfare i) / K > 0 := by
+  sorry  -- If not all equal, max > mean strictly
+
+/-! ## Spectral Radius and Stability -/
+
+/-- The spectral radius of the BR Jacobian determines stability.
+    When ρ(J) < 1, the fixed point is asymptotically stable (attracting).
+    When ρ(J) > 1, the fixed point is unstable (repelling). -/
+axiom spectral_radius_BR : ℝ → Simplex → ℝ  -- τ, fixed point → ρ(J)
+
+/-- At high temperature (τ > M), the spectral radius is < 1.
+    This is equivalent to the contraction property. -/
+theorem spectral_radius_contraction (hτM : τ > M) (π_star : Simplex) :
+    spectral_radius_BR τ π_star < 1 := by
+  sorry  -- Follows from: ρ(J) ≤ ||J|| ≤ M/τ < 1
+
 /-! ## Integration with Ω-Gradient -/
 
 -- The Ω-gradient update (from EvidenceWeightedPG.lean)

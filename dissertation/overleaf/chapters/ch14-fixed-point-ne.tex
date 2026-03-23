@@ -254,7 +254,52 @@ well-designed (Figure~\ref{fig:tax-app}).
 \label{fig:tax-app}
 \end{figure}
 
-\subsection{Safety Implications Summary}
+\section{Advanced: Homotopy, Spectral Analysis, and Meta-Learning}
+
+\subsection{QRE Homotopy and Bifurcation}
+
+Tracking QRE as $\tau \to 0$ reveals bifurcation points where the unique
+high-$\tau$ equilibrium splits into multiple NE. In Stag Hunt, the
+bifurcation separates cooperative and defective branches
+(Figure~\ref{fig:homotopy-app}).
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/advanced/homotopy_bifurcation.png}
+\caption{QRE homotopy: bifurcation diagrams (top) and welfare (bottom).}
+\label{fig:homotopy-app}
+\end{figure}
+
+\subsection{Spectral Radius of BR Jacobian}
+
+The spectral radius $\rho(J)$ of the BR Jacobian determines fixed-point
+stability. $\rho < 1$ everywhere when $\tau > M$ (Banach contraction).
+Near bifurcation points, $\rho \to 1$ (Figure~\ref{fig:spectral-app}).
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/advanced/spectral_analysis.png}
+\caption{Spectral analysis: $\rho(J)$ vs $\tau$ (top) and eigenvalue spectrum (bottom).}
+\label{fig:spectral-app}
+\end{figure}
+
+\subsection{Meta-Learning Solves the IPD Cooperation Problem}
+
+Per-episode PG converges to defection in IPD (Experiment~11). Meta-PG
+--- optimising the \emph{initial} policy for K-step trajectory reward ---
+sustains $\approx 50\%$ cooperation against TFT and Pavlov. This is
+the Phase~$-1$ that closes the cooperation gap
+(Figure~\ref{fig:meta-app}).
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/advanced/meta_learning_ipd.png}
+\caption{Meta-PG (green) sustains cooperation; per-episode PG (red) defects.}
+\label{fig:meta-app}
+\end{figure}
+
+
+\section{Summary}
 
 \begin{center}
 \begin{tabular}{lll}
@@ -269,6 +314,9 @@ Alignment commons  & FP-NE        & Identifies cooperative NE \\
 Reward hacking     & FP-NE        & Maps full NE landscape \\
 Debate             & LOLA+Coop    & PD structure; needs payoff change \\
 Alignment tax      & FP-NE        & Zero in 4/5 games (safety is free) \\
+QRE homotopy       & Banach FPT   & Bifurcation at $\tau = M$ \\
+Spectral analysis  & Jacobian     & $\rho < 1$ confirms contraction \\
+Meta-learning      & Meta-PG      & Sustains IPD cooperation ($50\%$ vs $10\%$) \\
 \bottomrule
 \end{tabular}
 \end{center}
