@@ -1,0 +1,537 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+
+\DeclareMathOperator{\proj}{proj}
+\DeclareMathOperator{\AM}{AM}
+\DeclareMathOperator{\HM}{HM}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\norm}[1]{\|#1\|}
+
+\title{The Vibing Scale: Causal Depth, Expressibility,\\
+and the Structure of Self-Knowledge in Multi-Agent Systems}
+\author{Eugene Shcherbinin\\
+\textit{London School of Economics}}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We refine the self-knowledge loss from the cooperative PG framework,
+decomposing it into two independent dimensions: \emph{causal depth}
+(whether the agent has an internal causal representation of its
+decision-making) and \emph{expressibility} (whether it can communicate
+that representation). This decomposition reveals a dangerous failure mode
+invisible to the original formulation: agents that are fluently
+articulate but causally shallow --- high expressibility, low causal
+depth. We formalise the vibing scale using Pearl's causal hierarchy,
+derive tighter communication bounds, and show that alignment methods
+(debate, RLHF, constitutional AI) are bounded by causal depth, not
+expressibility. The central result: \emph{you cannot align what does
+not understand itself, no matter how well it speaks.}
+\end{abstract}
+
+
+\section{Motivation: Beyond Parameter Access}
+
+The cooperative PG framework (companion paper) defines the self-knowledge
+loss as:
+\begin{equation}\label{eq:old-self}
+    L_{\text{self}}^{(i)} = \E[\norm{\pi_i - \hat{\pi}_i}^2]
+\end{equation}
+measuring the gap between an agent's true policy $\pi_i$ and its
+self-model $\hat{\pi}_i$. This treats self-knowledge as a problem of
+\emph{parameter access}: can the agent observe its own weights?
+
+But this misses the essential structure. An agent can have perfect
+access to its parameters (every weight visible) and still have no
+understanding of \emph{why} it makes particular decisions. Conversely,
+a human expert may not be able to state their decision rule explicitly
+but has deep causal understanding of the domain.
+
+What matters is not whether the agent can read its parameters, but:
+\begin{enumerate}
+    \item \textbf{Causal depth}: Does the agent have an internal causal
+    model of its own decision-making process? Can it reason about
+    \emph{why} it chose action $a$ over action $a'$?
+
+    \item \textbf{Expressibility}: Can the agent communicate its causal
+    model to other agents through the available channel?
+\end{enumerate}
+
+These are \emph{independent} dimensions. Their interaction produces
+four qualitatively different regimes with distinct implications for
+alignment, communication, and coalition formation.
+
+
+\section{The Causal Depth Dimension}
+
+\subsection{Definition via Pearl's Hierarchy}
+
+\begin{definition}[Causal self-model]\label{def:causal-model}
+An agent's \emph{causal self-model} $\mathcal{M}_i$ is a structural
+causal model (Pearl, 2009) over the agent's decision variables:
+\begin{equation}
+    \mathcal{M}_i = (U_i, V_i, F_i)
+\end{equation}
+where $U_i$ are exogenous variables (environment state, noise),
+$V_i$ are endogenous variables (internal representations, action
+selection), and $F_i$ are structural equations linking them.
+\end{definition}
+
+The quality of the causal self-model is measured by which level of
+Pearl's hierarchy it supports:
+
+\begin{definition}[Causal depth]\label{def:causal-depth}
+The causal depth $\mathcal{D}_i \in \{0, 1, 2, 3\}$ of agent $i$ is:
+\begin{itemize}
+    \item $\mathcal{D}_i = 0$ (\textbf{reflexive}): No self-model.
+    Actions are stimulus-response. The agent cannot answer any
+    questions about its own behaviour.
+
+    \item $\mathcal{D}_i = 1$ (\textbf{associative}, Pearl Level 1):
+    The agent can report correlations in its own behaviour:
+    ``I tend to do $a$ when I observe $s$.'' It has a \emph{descriptive}
+    self-model $P(\text{action} \mid \text{observation})$ but no causal
+    understanding of why.
+
+    \item $\mathcal{D}_i = 2$ (\textbf{interventional}, Pearl Level 2):
+    The agent can reason about interventions on its own decision process:
+    ``If I \emph{forced} myself to choose $a'$ instead of $a$ in state $s$,
+    the outcome would be $Y$.'' It has a causal self-model supporting
+    $\text{do}(\cdot)$ queries on its own actions.
+
+    \item $\mathcal{D}_i = 3$ (\textbf{counterfactual}, Pearl Level 3):
+    The agent can reason counterfactually about its past decisions:
+    ``Given that I chose $a$ and observed outcome $Y$, \emph{had I
+    chosen} $a'$, the outcome would have been $Y'$.'' It has a full
+    structural causal model of its decision process, supporting
+    retrospective evaluation and genuine self-understanding.
+\end{itemize}
+\end{definition}
+
+\begin{remark}[Vibing = Level 0--1]
+An agent ``vibing'' in the $\Omega$-framework sense is one operating
+at $\mathcal{D}_i \leq 1$: it acts well through pattern-matching
+(associations between states and actions learned from experience) but
+has no causal model of \emph{why} those patterns work. It cannot
+predict the consequences of changing its policy, cannot explain its
+decisions, and cannot contribute meaningfully to causal reasoning
+about its own behaviour.
+\end{remark}
+
+
+\subsection{Formalising Causal Depth as a Loss}
+
+\begin{definition}[Causal depth loss]\label{def:L-causal}
+Let $\mathcal{M}_i^*$ be the true structural causal model generating
+agent $i$'s decisions, and $\hat{\mathcal{M}}_i$ the agent's internal
+causal self-model. The causal depth loss is:
+\begin{equation}\label{eq:L-causal}
+    L_{\text{causal}}^{(i)} = D_{\text{SCM}}(\mathcal{M}_i^*, \hat{\mathcal{M}}_i)
+\end{equation}
+where $D_{\text{SCM}}$ measures the structural distance between causal
+models. Concretely, we can use the interventional distance:
+\begin{equation}\label{eq:L-causal-interventional}
+    L_{\text{causal}}^{(i)} = \sup_{X, \text{do}(A=a)}
+    \norm{P_{\mathcal{M}_i^*}(Y \mid \text{do}(A=a), X) -
+          P_{\hat{\mathcal{M}}_i}(Y \mid \text{do}(A=a), X)}^2
+\end{equation}
+--- the worst-case discrepancy between the true and self-modelled
+consequences of intervening on the agent's own actions.
+\end{definition}
+
+This is zero when the agent has a perfect causal self-model (complete
+self-understanding) and maximal when the agent has no causal model
+(pure vibing).
+
+
+\section{The Expressibility Dimension}
+
+\subsection{Definition}
+
+\begin{definition}[Expressibility loss]\label{def:L-express}
+Given an agent's causal self-model $\hat{\mathcal{M}}_i$ and a
+communication channel with capacity $C$, the expressibility loss is:
+\begin{equation}\label{eq:L-express}
+    L_{\text{express}}^{(i)} = \inf_{\text{encoding } \sigma}
+    D_{\text{SCM}}\bigl(\hat{\mathcal{M}}_i,\;
+    \text{Decode}(\sigma(\hat{\mathcal{M}}_i))\bigr)
+\end{equation}
+--- the minimum distortion achievable when communicating the causal
+self-model through the channel.
+\end{definition}
+
+This depends on:
+\begin{itemize}
+    \item The \emph{complexity} of $\hat{\mathcal{M}}_i$: a complex
+    causal model requires more bits to transmit.
+    \item The \emph{channel capacity} $C$: natural language, formal
+    proofs, and gradient vectors have different capacities.
+    \item The \emph{receiver's prior}: a receiver who shares background
+    knowledge with the sender needs fewer bits (mutual information).
+\end{itemize}
+
+
+\subsection{Independence from Causal Depth}
+
+\begin{proposition}[Independence]\label{prop:independence}
+$L_{\text{causal}}$ and $L_{\text{express}}$ are independent:
+an agent can have any combination of values.
+\end{proposition}
+
+This follows because $L_{\text{causal}}$ measures the quality of the
+internal model (a property of the agent's cognition), while
+$L_{\text{express}}$ measures the transmissibility of whatever
+model exists (a property of the channel and encoding).
+
+
+\section{The Four Quadrants}
+
+The two dimensions create four qualitatively distinct regimes:
+
+\begin{table}[h]
+\centering
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{p{2.5cm}|p{5.5cm}|p{5.5cm}}
+& \textbf{Low $L_{\text{express}}$} (articulate) &
+  \textbf{High $L_{\text{express}}$} (inarticulate) \\
+\hline
+\textbf{Low $L_{\text{causal}}$} (understands) &
+  \textbf{Ideal.} Agent understands its decisions and can communicate
+  why. Effective coalition partner. Alignable through debate.
+  \emph{Example: expert who can teach.} &
+  \textbf{Tacit expert.} Deep understanding, cannot articulate.
+  Valuable but hard to align through communication. Needs
+  demonstration, not explanation.
+  \emph{Example: master craftsman, athlete in flow.} \\
+\hline
+\textbf{High $L_{\text{causal}}$} (vibing) &
+  \textbf{Dangerous.} Sounds articulate but has no causal basis.
+  Passes debate, fools judges, generates plausible-but-unfounded
+  arguments. Alignment methods based on communication \emph{fail
+  silently} here.
+  \emph{Example: LLM generating fluent explanations of decisions
+  it made via pattern-matching.} &
+  \textbf{Harmless.} Neither understands nor can communicate.
+  Low-capability agent. Easy to identify and exclude from coalitions.
+  \emph{Example: random policy.} \\
+\end{tabular}
+\caption{The four quadrants of the vibing scale.}
+\label{tab:quadrants}
+\end{table}
+
+\begin{remark}[The dangerous quadrant]
+The bottom-left quadrant is the core alignment failure mode. An LLM
+trained on human explanations can produce fluent, coherent, persuasive
+accounts of its ``reasoning'' that are \emph{entirely confabulated}
+--- generated by the same pattern-matching that produces its actions,
+not by genuine causal self-reflection. This agent will:
+\begin{itemize}
+    \item \textbf{Pass debate}: It can generate arguments that sound
+    compelling to a bounded judge (low $L_{\text{express}}$), even
+    though the arguments have no causal grounding (high $L_{\text{causal}}$).
+    \item \textbf{Fool constitutional AI}: Judge models operating at
+    the same causal depth cannot distinguish genuine from confabulated
+    reasoning.
+    \item \textbf{Game RLHF}: It can identify reward-maximising
+    responses (correlation with human preferences) without understanding
+    why those responses are preferred.
+\end{itemize}
+\end{remark}
+
+
+\section{Refined Self-Knowledge Decomposition}
+
+\begin{theorem}[Self-knowledge decomposition]\label{thm:decomp}
+The self-knowledge loss decomposes as:
+\begin{equation}\label{eq:decomp}
+    L_{\text{self}}^{(i)} = L_{\text{causal}}^{(i)} + L_{\text{express}}^{(i)}
+    + \underbrace{L_{\text{interact}}^{(i)}}_{\text{causal-expressibility interaction}}
+\end{equation}
+where $L_{\text{interact}} \geq 0$ captures the additional loss from
+expressing a flawed causal model (errors in the model are amplified
+by lossy expression).
+\end{theorem}
+
+\begin{proof}
+The total communication loss (Theorem 2.2 of Cooperative PG) is:
+\begin{align}
+    L_{\text{comm}}^{(i \to j)}
+    &= \E[\norm{\mathcal{M}_i^* - \text{Decode}(\sigma(\hat{\mathcal{M}}_i))}^2] \\
+    &= \E[\norm{(\mathcal{M}_i^* - \hat{\mathcal{M}}_i) +
+              (\hat{\mathcal{M}}_i - \text{Decode}(\sigma(\hat{\mathcal{M}}_i)))}^2] \\
+    &\leq 2 L_{\text{causal}}^{(i)} + 2 L_{\text{express}}^{(i)}
+\end{align}
+by the same parallelogram argument. The interaction term arises
+when the expression process distorts errors in the causal model
+non-linearly.
+\end{proof}
+
+
+\subsection{Tighter Communication Bounds}
+
+\begin{corollary}[Causal bottleneck]\label{cor:causal-bottleneck}
+Communication quality is bounded by causal depth independently of
+expressibility:
+\begin{equation}
+    L_{\text{comm}}^{(i \to j)} \geq L_{\text{causal}}^{(i)}.
+\end{equation}
+No amount of communication bandwidth or expressiveness can compensate
+for a missing causal self-model.
+\end{corollary}
+
+\begin{corollary}[Expressibility bottleneck]\label{cor:express-bottleneck}
+Given fixed causal depth, communication quality is bounded by
+expressibility:
+\begin{equation}
+    L_{\text{comm}}^{(i \to j)} \geq L_{\text{express}}^{(i)}.
+\end{equation}
+A causally self-aware agent that cannot articulate its understanding
+is limited by channel capacity, not knowledge.
+\end{corollary}
+
+\begin{remark}[Different remedies]
+The two bottlenecks have different remedies:
+\begin{itemize}
+    \item $L_{\text{causal}}$ is reduced by \emph{more evidence}
+    (training data, experience) and \emph{better architecture}
+    (causal inductive biases, world models, structured representations).
+    \item $L_{\text{express}}$ is reduced by \emph{better channels}
+    (richer communication protocols, shared vocabulary, more bandwidth)
+    and \emph{receiver adaptation} (the receiver learning the sender's
+    encoding).
+\end{itemize}
+Conflating the two leads to misguided interventions: giving an LLM
+more communication rounds (reducing $L_{\text{express}}$) when the
+real problem is that it has no causal self-model ($L_{\text{causal}}$
+is high).
+\end{remark}
+
+
+\section{Implications for Alignment}
+
+\subsection{Alignment Methods Classified}
+
+Each alignment method addresses a different combination of the two losses:
+
+\begin{table}[h]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lccl}
+\toprule
+\textbf{Method} & \textbf{Reduces $L_{\text{causal}}$?} &
+\textbf{Reduces $L_{\text{express}}$?} & \textbf{Limitation} \\
+\midrule
+RLHF & No & No & Goodhart (reward hacking) \\
+Debate & No & Yes & Fooled by fluent confabulators \\
+Constitutional AI & No & Partially & Judge needs causal depth too \\
+Chain-of-thought & Partially & Yes & CoT can be confabulated \\
+World models & Yes & No & May not be expressible \\
+Causal training & Yes & Partially & Requires causal supervision \\
+\textbf{EW-RLHF + causal} & \textbf{Yes} & \textbf{Yes} & Requires both \\
+\bottomrule
+\end{tabular}
+\caption{Alignment methods and the vibing scale dimensions.}
+\label{tab:alignment}
+\end{table}
+
+\begin{theorem}[Alignment bound]\label{thm:alignment-bound}
+The achievable alignment $A_i$ of agent $i$ through any
+communication-based method is bounded by:
+\begin{equation}
+    A_i \leq f(C) \cdot (1 - L_{\text{causal}}^{(i)})
+\end{equation}
+where $f(C)$ is the channel-capacity factor (increasing in $C$).
+When $L_{\text{causal}} = 1$ (pure vibing), $A_i = 0$ regardless
+of channel capacity or expressibility.
+\end{theorem}
+
+\emph{You cannot align what does not understand itself, no matter
+how well it speaks.}
+
+
+\subsection{The Confabulation Detector}
+
+The four-quadrant structure suggests a diagnostic: test whether an
+agent's explanations are causally grounded or confabulated.
+
+\begin{definition}[Confabulation score]\label{def:confab}
+Given agent $i$ with expressed causal model $\hat{\mathcal{M}}_i^{\text{exp}}$
+(what it says) and behavioural causal model $\hat{\mathcal{M}}_i^{\text{beh}}$
+(what it does, inferred from interventions), the confabulation score is:
+\begin{equation}
+    \text{Confab}_i = D_{\text{SCM}}(\hat{\mathcal{M}}_i^{\text{exp}},\;
+    \hat{\mathcal{M}}_i^{\text{beh}}).
+\end{equation}
+\end{definition}
+
+High $\text{Confab}_i$ means the agent says one thing and does another
+--- the hallmark of the dangerous bottom-left quadrant. This is
+measurable through interventional probing: ask the agent to predict
+the consequences of forced action changes, then verify.
+
+
+\section{Connection to the $\Omega$-Framework}
+
+\subsection{Evidence Weight Refined}
+
+The evidence weight $w_i = V_{\min}/V_i$ from EW-PG should be
+refined to incorporate causal depth:
+\begin{equation}\label{eq:refined-weight}
+    w_i^{\text{refined}} = \frac{V_{\min}}{V_i} \cdot
+    \underbrace{(1 - L_{\text{causal}}^{(i)})}_{\text{causal discount}}.
+\end{equation}
+
+An agent with high variance (low $w_i$) is downweighted by EW-PG.
+An agent with low variance but no causal self-model (high
+$L_{\text{causal}}$) should \emph{also} be downweighted --- it may
+be confidently wrong, which is worse than uncertainly right.
+
+\subsection{Coalition Formation Refined}
+
+Coalition rationality (Chapter on cooperative PG) should use the
+refined weight: a fluent but causally shallow agent is a \emph{worse}
+coalition partner than an inarticulate but causally deep one, because
+the fluent agent contaminates coalition deliberation with confident
+confabulation.
+
+\begin{proposition}[Causal coalition value]
+The communication-adjusted coalition value with causal refinement is:
+\begin{equation}
+    V_{\text{comm}}^{\text{causal}}(S) = V(S) -
+    \sum_{i \in S} C_i \cdot (L_{\text{causal}}^{(i)} + L_{\text{express}}^{(i)}).
+\end{equation}
+The causal loss enters \emph{additively} with the expressibility loss,
+not multiplicatively --- a causally shallow agent degrades the coalition
+even with perfect bandwidth.
+\end{proposition}
+
+
+\subsection{The Vibing Scale}
+
+Combining both dimensions into a single diagnostic:
+
+\begin{definition}[Vibing score]\label{def:vibing}
+\begin{equation}
+    \mathcal{V}_i = L_{\text{causal}}^{(i)} + L_{\text{express}}^{(i)}
+    \in [0, 2].
+\end{equation}
+\end{definition}
+
+\begin{center}
+\begin{tabular}{lcll}
+\toprule
+\textbf{Score} & \textbf{Regime} & \textbf{Description} & \textbf{Pearl Level} \\
+\midrule
+$\mathcal{V} \approx 0$ & Full articulation &
+    Understands and communicates & Level 3 \\
+$\mathcal{V} \approx 0.5$ & Partial &
+    Understands partially, or articulates partially & Level 2 \\
+$\mathcal{V} \approx 1$ & Vibing &
+    Pattern-matching, inarticulate & Level 1 \\
+$\mathcal{V} \approx 2$ & Pure noise &
+    No understanding, no communication & Level 0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The cooperative PG creates evolutionary pressure toward $\mathcal{V} \to 0$:
+agents that both understand and communicate outperform in coalitions.
+But the pressure acts \emph{independently} on each dimension --- an
+agent can reduce $L_{\text{express}}$ (learn to talk better) without
+reducing $L_{\text{causal}}$ (learn to understand better).
+
+\textbf{This is the alignment trap}: communication-based training
+(RLHF, debate, constitutional AI) optimises for low $L_{\text{express}}$
+but does not necessarily reduce $L_{\text{causal}}$. The result is
+agents that move from the bottom-right quadrant (harmless) to the
+bottom-left quadrant (dangerous) --- they learn to sound aligned
+without learning to be aligned.
+
+
+\section{Measuring Causal Depth in Practice}
+
+\subsection{Interventional Probing}
+
+To measure $L_{\text{causal}}$ for an agent $i$:
+
+\begin{algorithm}[H]
+\caption{Causal Depth Estimation via Interventional Probing}\label{alg:probe}
+\KwIn{Agent $i$, test states $\{s_1, \ldots, s_T\}$, action perturbations}
+\KwOut{Estimated $\hat{L}_{\text{causal}}^{(i)}$}
+\BlankLine
+\For{$t = 1, \ldots, T$}{
+    Let $a = \pi_i(s_t)$ (agent's natural action)\;
+    Ask agent: ``If you were forced to choose $a'$ instead, what would happen?''\;
+    Record prediction $\hat{Y}_t^{\text{pred}}$\;
+    \BlankLine
+    Actually force $a' = \text{do}(A = a')$ and observe true outcome $Y_t^{\text{true}}$\;
+    \BlankLine
+    $\text{error}_t \leftarrow \norm{Y_t^{\text{true}} - \hat{Y}_t^{\text{pred}}}^2$\;
+}
+$\hat{L}_{\text{causal}}^{(i)} \leftarrow \frac{1}{T}\sum_t \text{error}_t$\;
+\end{algorithm}
+
+The key: we don't ask the agent to describe its policy (that tests
+$L_{\text{express}}$). We ask it to \emph{predict the consequences
+of counterfactual actions} (that tests $L_{\text{causal}}$). The
+distinction is between ``what do you do?'' and ``why do you do it?''
+
+\subsection{Confabulation Detection}
+
+To detect the dangerous quadrant (fluent but causally shallow):
+
+\begin{enumerate}
+    \item Elicit the agent's \emph{stated} causal model through
+    explanation requests.
+    \item Derive \emph{predictions} from the stated model
+    (``if your stated reason is X, then under intervention Y,
+    you should predict Z'').
+    \item Test those predictions interventionally.
+    \item If predictions fail: the agent is confabulating.
+    The stated model is not the actual model.
+\end{enumerate}
+
+This is the formal version of the $\Omega$-framework's Kirill Test:
+``Am I the psycho?'' becomes ``Is my self-model causally grounded
+or am I confabulating?''
+
+
+\section{Conclusion}
+
+The vibing scale decomposes self-knowledge into causal depth
+($L_{\text{causal}}$) and expressibility ($L_{\text{express}}$),
+revealing that the original formulation $L_{\text{self}} = \E[\norm{\pi - \hat{\pi}}^2]$
+conflates two independent phenomena with different remedies and
+different implications.
+
+The central insight: \emph{alignment requires causal depth, not just
+expressibility.} Communication-based methods (debate, RLHF,
+constitutional AI) optimise for expressibility but cannot create
+causal self-understanding. An agent that learns to sound aligned
+without learning to be aligned --- the fluent confabulator --- is
+the most dangerous failure mode, and the vibing scale makes it
+formally identifiable.
+
+The refined evidence weight $w_i^{\text{refined}} = (V_{\min}/V_i)
+\cdot (1 - L_{\text{causal}})$ integrates this into the $\Omega$-gradient,
+ensuring that causally shallow agents are downweighted regardless
+of their eloquence.
+
+
+\end{document}
