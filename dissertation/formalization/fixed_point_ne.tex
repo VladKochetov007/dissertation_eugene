@@ -1,0 +1,392 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+
+\DeclareMathOperator{\proj}{proj}
+\DeclareMathOperator{\AM}{AM}
+\DeclareMathOperator{\HM}{HM}
+\DeclareMathOperator{\BR}{BR}
+\DeclareMathOperator{\supp}{supp}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\ip}[2]{\langle #1, #2 \rangle}
+\newcommand{\norm}[1]{\|#1\|}
+
+\title{Fixed-Point Nash Equilibrium Search with Bayesian Stopping:\\
+A Functional-Analytic Approach to Explore-Exploit in Multi-Agent Systems}
+\author{Eugene Shcherbinin\\
+\textit{London School of Economics}\\
+\texttt{y.shcherbinin@lse.ac.uk}}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We develop a fixed-point theoretic approach to Nash equilibrium (NE)
+discovery in multi-agent systems. A Nash equilibrium is a fixed point of
+the joint best-response correspondence $\BR: \Delta \rightrightarrows \Delta$,
+where $\Delta = \prod_i \Delta(\mathcal{A}_i)$ is the product of strategy
+simplices. By smoothing $\BR$ with a temperature parameter $\tau > 0$,
+we obtain a continuous map $\BR_\tau: \Delta \to \Delta$ that is a
+contraction for sufficiently small $\tau$ (by Banach's fixed-point theorem).
+We then pose the problem of finding the \emph{best} NE as a Bayesian
+optimization problem over the fixed-point set, with a Good-Turing-style
+estimator governing when to stop exploring. Key insight: \emph{all selfish
+agents benefit from thorough NE search}, creating emergent cooperation
+in the exploration phase even in competitive games. This ``Fixed-Point
+NE Search'' (FP-NE) serves as a meta-algorithm wrapping the $\Omega$-gradient,
+initializing it at the best discovered equilibrium.
+\end{abstract}
+
+\tableofcontents
+
+
+%% ========================================================================
+\section{Setup}
+\label{sec:setup}
+%% ========================================================================
+
+Consider an $N$-player normal-form game $\mathcal{G} = (N, \{\mathcal{A}_i\}_{i=1}^N, \{R_i\}_{i=1}^N)$
+where agent $i$ has action set $\mathcal{A}_i$ with $|\mathcal{A}_i| = d_i$
+and payoff function $R_i : \mathcal{A} \to \R$, where $\mathcal{A} = \prod_i \mathcal{A}_i$.
+
+Mixed strategies live on the product simplex
+$\Delta = \prod_{i=1}^N \Delta(\mathcal{A}_i)$, where
+$\Delta(\mathcal{A}_i) = \{\pi_i \in \R^{d_i}_{\geq 0} : \sum_{a} \pi_i(a) = 1\}$.
+
+The expected payoff to agent $i$ under joint mixed strategy $\pi = (\pi_1, \ldots, \pi_N)$ is:
+\begin{equation}
+    V_i(\pi) = \sum_{a \in \mathcal{A}} \left(\prod_{j=1}^N \pi_j(a_j)\right) R_i(a).
+\end{equation}
+
+\begin{definition}[Best Response]
+The \emph{best-response correspondence} for agent $i$ is:
+\begin{equation}
+    \BR_i(\pi_{-i}) = \arg\max_{\pi_i \in \Delta(\mathcal{A}_i)} V_i(\pi_i, \pi_{-i}).
+\end{equation}
+The \emph{joint best-response} is $\BR(\pi) = (\BR_1(\pi_{-1}), \ldots, \BR_N(\pi_{-N}))$.
+\end{definition}
+
+\begin{definition}[Nash Equilibrium as Fixed Point]
+A strategy profile $\pi^* \in \Delta$ is a Nash equilibrium if and only if
+$\pi^* \in \BR(\pi^*)$, i.e., $\pi^*$ is a \emph{fixed point} of $\BR$.
+\end{definition}
+
+
+%% ========================================================================
+\section{Smoothed Best Response and Contraction}
+\label{sec:contraction}
+%% ========================================================================
+
+The best-response correspondence $\BR$ is set-valued and discontinuous,
+making fixed-point iteration problematic. We replace it with the
+\emph{softmax (logit) best response}:
+
+\begin{definition}[Smoothed Best Response]
+For temperature $\tau > 0$, define the smoothed best-response map
+$\BR_\tau : \Delta \to \Delta$ by:
+\begin{equation}\label{eq:soft-br}
+    \BR_{\tau,i}(\pi_{-i})(a) = \frac{\exp\left(\frac{1}{\tau} \sum_{a_{-i}} \pi_{-i}(a_{-i}) R_i(a, a_{-i})\right)}
+    {\sum_{a'} \exp\left(\frac{1}{\tau} \sum_{a_{-i}} \pi_{-i}(a_{-i}) R_i(a', a_{-i})\right)}.
+\end{equation}
+\end{definition}
+
+The key property: $\BR_\tau$ is a smooth self-map on $\Delta$, and its
+fixed points are the \emph{quantal response equilibria} (QRE) of
+McKelvey and Palfrey (1995). As $\tau \to 0$, QRE converge to Nash equilibria.
+
+\begin{theorem}[Contraction Property]\label{thm:contraction}
+For any finite game with payoffs bounded by $\|R_i\|_\infty \leq M$,
+the smoothed best-response map $\BR_\tau$ satisfies:
+\begin{equation}
+    \|\BR_\tau(\pi) - \BR_\tau(\pi')\|_\infty \leq \frac{M}{\tau} \cdot \|\pi - \pi'\|_\infty
+\end{equation}
+for all $\pi, \pi' \in \Delta$. In particular, if $\tau > M$, then
+$\BR_\tau$ is a \emph{contraction mapping} with Lipschitz constant $c = M/\tau < 1$.
+\end{theorem}
+
+\begin{proof}
+The softmax function $\sigma_\tau(x)(a) = \exp(x_a/\tau) / \sum_{a'} \exp(x_{a'}/\tau)$
+has Lipschitz constant $1/(2\tau)$ in $\|\cdot\|_\infty$ norm.
+The linear map $\pi_{-i} \mapsto R_i(\cdot, \pi_{-i})$ has operator norm bounded by $M$.
+By composition, $\BR_{\tau,i}$ is Lipschitz with constant $M/\tau$.
+\end{proof}
+
+\begin{corollary}[Banach Fixed-Point Theorem Applied]
+When $\tau > M$, the damped iteration
+$\pi_{t+1} = (1-\alpha)\pi_t + \alpha \cdot \BR_\tau(\pi_t)$ converges
+to the unique QRE at geometric rate $\max(1-\alpha, c)^t$ from any initialization.
+\end{corollary}
+
+\begin{remark}
+For $\tau \leq M$, $\BR_\tau$ may have multiple fixed points (corresponding
+to multiple QRE/NE). This is precisely the regime where the
+\emph{equilibrium selection problem} arises and where our Bayesian search
+becomes valuable.
+\end{remark}
+
+
+%% ========================================================================
+\section{Bayesian NE Discovery}
+\label{sec:bayesian}
+%% ========================================================================
+
+When $\tau$ is small (close to NE), the game may have multiple fixed
+points. We frame the problem of finding the \emph{best} fixed point
+as a species-discovery problem.
+
+\subsection{The Explore-Exploit Tradeoff}
+
+\begin{definition}[NE Search Problem]
+Given a game $\mathcal{G}$ with unknown set of Nash equilibria
+$\mathcal{E} = \{\pi^{*,1}, \ldots, \pi^{*,K}\}$ (where $K$ is unknown),
+find $\pi^{*,k}$ maximizing a selection criterion $\phi(\pi^{*,k})$
+(e.g., social welfare $\sum_i V_i(\pi^{*,k})$, or agent $i$'s payoff $V_i(\pi^{*,k})$).
+\end{definition}
+
+Each ``search'' consists of:
+\begin{enumerate}
+    \item Sample a random initialization $\pi_0 \sim \text{Dir}(\mathbf{1})$
+    (or perturb a known NE).
+    \item Run damped $\BR_\tau$ iteration until convergence.
+    \item Record the fixed point (if residual $\|\BR_\tau(\pi) - \pi\| < \epsilon$).
+    \item Check if it is distinct from previously discovered NE.
+\end{enumerate}
+
+\subsection{Good-Turing Estimator for Total NE Count}
+
+We adapt the classical species-discovery framework to NE counting.
+After $n$ searches discovering $d$ distinct NE, the probability of
+finding a \emph{new} NE on the next search is estimated by:
+
+\begin{equation}\label{eq:coverage}
+    \hat{p}_{\text{new}} = 1 - \hat{C}_n, \qquad
+    \hat{C}_n = 1 - \frac{f_1}{n}
+\end{equation}
+where $f_1$ is the number of NE discovered exactly once (singletons)
+and $\hat{C}_n$ is the Good-Turing coverage estimator.
+
+The Chao1 estimator for total species (NE) count:
+\begin{equation}
+    \hat{K} = d + \frac{f_1^2}{2 f_2}
+\end{equation}
+where $f_2$ is the number of NE discovered exactly twice.
+
+\subsection{Bayesian Stopping Rule}
+
+\begin{definition}[Stopping Criterion]
+Define the \emph{exploration value} for agent $i$ as:
+\begin{equation}
+    \text{EV}_i = \Prob(\exists \text{ undiscovered } \pi^* : V_i(\pi^*) > V_i^{\text{best}})
+\end{equation}
+where $V_i^{\text{best}} = \max_{k \leq d} V_i(\pi^{*,k})$ is the best
+discovered payoff for agent $i$.
+
+Stop exploring when $\text{EV}_i < \delta$ for all agents $i$.
+\end{definition}
+
+The probability decomposes as:
+\begin{equation}
+    \text{EV}_i \leq \Prob(\text{undiscovered NE exist}) \times
+    \Prob(\text{random NE is better} \mid \text{it exists}).
+\end{equation}
+
+The first factor is estimated by $1 - d/\hat{K}$. The second factor
+can be bounded using the empirical distribution of discovered NE payoffs.
+
+
+%% ========================================================================
+\section{Cooperation from Selfish Search}
+\label{sec:cooperation}
+%% ========================================================================
+
+The central insight: \emph{in games with multiple NE, the search for the
+best NE is a public good that selfish agents voluntarily provide.}
+
+\begin{proposition}[Search as Public Good]\label{prop:public-good}
+Consider a game with NE set $\mathcal{E} = \{\pi^{*,1}, \ldots, \pi^{*,K}\}$
+where $K \geq 2$. Let $\pi^{*,P}$ denote the Pareto-best NE
+(maximizing $\sum_i V_i$). If agents use a selection criterion
+$\phi_i(\pi) = V_i(\pi)$, then under mild conditions on the payoff
+structure\footnote{Specifically, when the correlation between agents'
+payoffs across NE is positive: $\text{Corr}(V_i(\pi^{*,k}), V_j(\pi^{*,k})) > 0$ over $k$.},
+increasing the search budget benefits \emph{all} agents:
+\begin{equation}
+    \frac{\partial}{\partial n} \E\left[\max_{k \leq d(n)} V_i(\pi^{*,k})\right] > 0
+    \quad \forall i.
+\end{equation}
+\end{proposition}
+
+\begin{proof}[Sketch]
+More search discovers more NE. Across NE, payoffs tend to be positively
+correlated (Pareto-better NE are better for most agents). Thus the
+probability that a newly discovered NE improves agent $i$'s best
+available payoff is positive for all $i$ simultaneously.
+\end{proof}
+
+\begin{remark}
+This is a \emph{functional-analytic} grounding of cooperation: it
+arises not from altruism or mechanism design but from the topological
+structure of the fixed-point set. The fixed points of $\BR$ are
+shared landmarks that all agents want to map.
+\end{remark}
+
+
+%% ========================================================================
+\section{Integration with the $\Omega$-Framework}
+\label{sec:omega}
+%% ========================================================================
+
+FP-NE search serves as a \emph{Phase 0} preceding the $\Omega$-gradient:
+
+\begin{algorithm}[H]
+\SetAlgoLined
+\KwIn{Game $\mathcal{G}$, $\Omega$-config $(\gamma, w, \lambda, \beta)$,
+FP-NE budget $B$, confidence $\delta$}
+\KwOut{Learned policy profile $\hat{\pi}$}
+
+\tcp{Phase 0: Fixed-Point NE Search}
+Initialize $\mathcal{D} \leftarrow \emptyset$ \tcp*{discovered NE}
+\For{$s = 1, \ldots, B$}{
+    Sample $\pi_0 \sim \text{Dir}(\mathbf{1})$ or perturb best known NE\;
+    $\pi^* \leftarrow \text{DampedBR}_\tau(\pi_0)$ \tcp*{Banach iteration}
+    \If{$\|\BR_\tau(\pi^*) - \pi^*\| < \epsilon$ \textbf{and} $\pi^*$ is new}{
+        $\mathcal{D} \leftarrow \mathcal{D} \cup \{\pi^*\}$\;
+    }
+    \If{$\text{EV}_i < \delta$ for all $i$}{
+        \textbf{break} \tcp*{Bayesian stopping}
+    }
+}
+$\hat{\pi}_{\text{init}} \leftarrow \arg\max_{\pi^* \in \mathcal{D}} \sum_i V_i(\pi^*)$\;
+
+\tcp{Phase 1: $\Omega$-Gradient from best NE}
+$\pi_0 \leftarrow \hat{\pi}_{\text{init}}$\;
+\For{$n = 1, 2, \ldots$}{
+    $\pi_{n+1} \leftarrow \proj_\Delta\!\left(\pi_n + \gamma_n \cdot w_n \cdot (\hat{v}_n + \lambda_n \cdot \text{OS}_n + \beta_n \cdot \text{coop}_n)\right)$\;
+}
+\Return{$\pi_n$}
+\caption{$\Omega$-PG with FP-NE Initialization}
+\label{alg:omega-fpne}
+\end{algorithm}
+
+\begin{theorem}[FP-NE Preserves $\Omega$-Convergence]
+If the $\Omega$-gradient converges to a stable NE $\pi^*$ from any
+initialization in basin $\mathcal{B}(\pi^*)$, and FP-NE search
+discovers $\pi^*$ with probability $\geq 1 - \epsilon$, then
+$\Omega$-PG with FP-NE initialization converges to the best
+discoverable NE with probability $\geq 1 - \epsilon$.
+\end{theorem}
+
+The advantage over random initialization: random init lands in the
+basin of an arbitrary NE. FP-NE search explicitly maps the fixed-point
+landscape and selects the best basin before starting the $\Omega$-gradient.
+
+
+%% ========================================================================
+\section{Connection to Kakutani and Brouwer}
+\label{sec:kakutani}
+%% ========================================================================
+
+The existence of Nash equilibria is guaranteed by Kakutani's fixed-point
+theorem (for the set-valued BR correspondence) or equivalently by
+Brouwer's theorem (for the smoothed map $\BR_\tau$).
+
+\begin{theorem}[Nash 1950, via Kakutani]
+Every finite game has at least one mixed-strategy Nash equilibrium.
+\end{theorem}
+
+Our contribution is algorithmic: given that fixed points \emph{exist},
+we provide an efficient method to \emph{find them all} (or at least
+the best ones) with Bayesian confidence guarantees on completeness.
+
+The functional-analytic perspective:
+\begin{itemize}
+    \item $\Delta$ is compact and convex (finite-dimensional simplex).
+    \item $\BR_\tau : \Delta \to \Delta$ is continuous for $\tau > 0$.
+    \item By Brouwer, $\BR_\tau$ has at least one fixed point.
+    \item For $\tau > M$: unique fixed point (Banach contraction).
+    \item For $\tau \leq M$: possibly multiple fixed points.
+    Decreasing $\tau$ from $> M$ to near $0$ traces the \emph{QRE
+    correspondence} connecting the unique high-$\tau$ QRE to the
+    (possibly multiple) NE.
+\end{itemize}
+
+This suggests a \emph{homotopy method}: start at high $\tau$ (unique
+contraction), gradually decrease $\tau$, and track how the unique
+fixed point bifurcates into multiple NE. Branch points in this
+homotopy correspond to equilibrium selection events.
+
+
+%% ========================================================================
+\section{Experimental Predictions}
+\label{sec:predictions}
+%% ========================================================================
+
+\begin{enumerate}
+    \item \textbf{NE Discovery}: FP-NE search discovers all NE in games
+    with known equilibrium sets (validated against nashpy).
+    \item \textbf{Bayesian Stopping}: The stopping criterion correlates
+    with actual search completeness.
+    \item \textbf{Equilibrium Selection}: FP-NE + $\Omega$-PG achieves
+    higher social welfare than $\Omega$-PG alone in games with multiple NE.
+    \item \textbf{Contraction Rates}: Empirical contraction constants
+    of $\BR_\tau$ match the theoretical bound $M/\tau$.
+    \item \textbf{Cooperation from Selfishness}: In multi-NE games,
+    increasing search budget improves welfare for \emph{all} agents.
+\end{enumerate}
+
+
+\bibliographystyle{plain}
+\begin{thebibliography}{10}
+
+\bibitem{nash1950}
+J.~Nash. Equilibrium points in $n$-person games. \emph{PNAS}, 36(1):48--49, 1950.
+
+\bibitem{kakutani1941}
+S.~Kakutani. A generalization of Brouwer's fixed point theorem.
+\emph{Duke Math. J.}, 8(3):457--459, 1941.
+
+\bibitem{mckelvey1995}
+R.~McKelvey and T.~Palfrey. Quantal response equilibria for normal form games.
+\emph{Games and Economic Behavior}, 10(1):6--38, 1995.
+
+\bibitem{giannou2022}
+A.~Giannou, K.~Lotidis, P.~Mertikopoulos, and P.~Vlatakis-Gkaragkounis.
+On the convergence of policy gradient methods to Nash equilibria in general
+stochastic games. \emph{NeurIPS}, 2022.
+
+\bibitem{chao1984}
+A.~Chao. Nonparametric estimation of the number of classes in a population.
+\emph{Scandinavian Journal of Statistics}, 11(4):265--270, 1984.
+
+\bibitem{good1953}
+I.~J.~Good. The population frequencies of species and the estimation of
+population parameters. \emph{Biometrika}, 40(3/4):237--264, 1953.
+
+\bibitem{foerster2018}
+J.~Foerster, R.~Chen, M.~Al-Shedivat, S.~Whiteson, P.~Abbeel, and I.~Mordatch.
+Learning with opponent-learning awareness. \emph{AAMAS}, 2018.
+
+\bibitem{kim2021}
+D.-K.~Kim, M.~Liu, M.~Riemer, C.~Sun, M.~Abdulhai, G.~Habibi,
+S.~Lopez-Cot, G.~Tesauro, and J.~P.~How. A policy gradient algorithm
+for learning to learn in multiagent reinforcement learning.
+\emph{ICML}, 2021.
+
+\end{thebibliography}
+
+\end{document}
