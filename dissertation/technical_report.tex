@@ -790,20 +790,24 @@ The opponent-shaping and cooperative terms address the same risk
 In mixed settings (coalitions competing against each other), both
 channels provide complementary information.
 
-\subsection{The Vibing Spectrum}
+\subsection{The Vibing Scale: A Horseshoe, Not a Line}
 
-The $\mathcal{O} \to \Pi$ mapping defines a continuum:
+The self-knowledge loss $L_{\text{self}}$ decomposes into \emph{causal depth} $L_{\text{causal}}$ (does the agent have an internal causal model of its decisions?) and \emph{expressibility} $L_{\text{express}}$ (can it communicate that model?). These are independent dimensions.
+
+The need to articulate follows a \textbf{horseshoe}:
 \begin{equation*}
-    \underbrace{\text{Full articulation}}_{\substack{L_{\text{self}} \approx 0 \\
-    \text{Pearl Level 3}}}
-    \quad\longleftrightarrow\quad
-    \underbrace{\text{Pure vibing}}_{\substack{L_{\text{self}} \approx V_{\max} \\
-    \text{Pearl Level 1}}}
+    \mathcal{N}_{\text{express}} = L_{\text{causal}} \cdot (1 - L_{\text{causal}})
 \end{equation*}
-The cooperative PG creates evolutionary pressure toward articulability:
-agents that can communicate are more valuable coalition partners.
-This formalizes the $\Omega$-framework's claim that multi-agent
-interaction drives agents up Pearl's causal hierarchy.
+maximal at intermediate understanding, zero at both extremes:
+\begin{itemize}
+    \item $L_{\text{causal}} \approx 0$ (\textbf{vibing}): Deep understanding, no need to explain. ``Line go up.'' Communicates through action (tacit knowledge channel).
+    \item $L_{\text{causal}} \approx 0.5$ (\textbf{articulator}): Fragile understanding, maximum need to explain. ``It's a Transformer with multi-head attention!!''
+    \item $L_{\text{causal}} \approx 1$ (\textbf{noise}): No understanding, nothing to say. ``Line go up'' --- same words, encoding nothing.
+\end{itemize}
+
+The \emph{confabulator} ($\mathcal{D} = 1$, low $L_{\text{express}}$) is the true danger: fluently articulate but causally shallow. Communication-based alignment (debate, RLHF, constitutional AI) optimises for low $L_{\text{express}}$ without increasing causal depth --- producing agents that sound aligned without being aligned.
+
+The refined evidence weight $w_i^{\text{refined}} = (V_{\min}/V_i) \cdot (1 - L_{\text{causal}})$ ensures confabulators are downweighted regardless of eloquence, while vibing agents are valued for their behavioural contributions.
 
 \subsection{Limitations and Future Work}
 

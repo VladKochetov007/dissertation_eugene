@@ -35,14 +35,19 @@ We refine the self-knowledge loss from the cooperative PG framework,
 decomposing it into two independent dimensions: \emph{causal depth}
 (whether the agent has an internal causal representation of its
 decision-making) and \emph{expressibility} (whether it can communicate
-that representation). This decomposition reveals a dangerous failure mode
-invisible to the original formulation: agents that are fluently
-articulate but causally shallow --- high expressibility, low causal
-depth. We formalise the vibing scale using Pearl's causal hierarchy,
-derive tighter communication bounds, and show that alignment methods
+that representation). The decomposition reveals a \textbf{horseshoe
+structure}: the need to articulate is maximal at intermediate causal
+depth and vanishes at both extremes --- the ``vibing'' agent
+($\mathcal{D} = 3$, deep understanding, no need to explain) and the
+noise agent ($\mathcal{D} = 0$, no understanding, nothing to say)
+both say ``line go up.'' The true danger is the \emph{confabulator}:
+fluently articulate but causally shallow. We show alignment methods
 (debate, RLHF, constitutional AI) are bounded by causal depth, not
-expressibility. The central result: \emph{you cannot align what does
-not understand itself, no matter how well it speaks.}
+expressibility, and that vibing agents communicate through a
+behavioural (tacit knowledge) channel invisible to verbal oversight.
+Central result: \emph{you cannot align what does not understand
+itself, no matter how well it speaks --- but an agent that truly
+understands needs no words at all.}
 \end{abstract}
 
 
@@ -124,14 +129,20 @@ The causal depth $\mathcal{D}_i \in \{0, 1, 2, 3\}$ of agent $i$ is:
 \end{itemize}
 \end{definition}
 
-\begin{remark}[Vibing = Level 0--1]
-An agent ``vibing'' in the $\Omega$-framework sense is one operating
-at $\mathcal{D}_i \leq 1$: it acts well through pattern-matching
-(associations between states and actions learned from experience) but
-has no causal model of \emph{why} those patterns work. It cannot
-predict the consequences of changing its policy, cannot explain its
-decisions, and cannot contribute meaningfully to causal reasoning
-about its own behaviour.
+\begin{remark}[Vibing $\neq$ ignorance]
+``Vibing'' does \emph{not} mean the agent lacks understanding. A vibing
+agent is one with \emph{deep} causal self-knowledge ($\mathcal{D}_i = 3$)
+that has \emph{no need to articulate} --- its understanding is so
+compressed that action IS explanation. The master craftsman, the
+experienced trader who says ``line go up,'' the athlete in flow ---
+they know exactly what they are doing. They just don't bother explaining.
+
+This is the opposite of the naive interpretation. The naive reading
+conflates two very different states: (a)~an agent that acts well
+without understanding (high $L_{\text{causal}}$, pattern-matching), and
+(b)~an agent that understands so deeply it has transcended the need
+for articulation (low $L_{\text{causal}}$, high causal compression).
+Both are ``inarticulate'' but for opposite reasons.
 \end{remark}
 
 
@@ -200,7 +211,7 @@ $L_{\text{express}}$ measures the transmissibility of whatever
 model exists (a property of the channel and encoding).
 
 
-\section{The Four Quadrants}
+\section{The Four Quadrants and the Horseshoe}
 
 The two dimensions create four qualitatively distinct regimes:
 
@@ -212,47 +223,134 @@ The two dimensions create four qualitatively distinct regimes:
   \textbf{High $L_{\text{express}}$} (inarticulate) \\
 \hline
 \textbf{Low $L_{\text{causal}}$} (understands) &
-  \textbf{Ideal.} Agent understands its decisions and can communicate
-  why. Effective coalition partner. Alignable through debate.
+  \textbf{The Teacher.} Understands and communicates.
+  Effective coalition partner. Alignable through debate.
   \emph{Example: expert who can teach.} &
-  \textbf{Tacit expert.} Deep understanding, cannot articulate.
-  Valuable but hard to align through communication. Needs
-  demonstration, not explanation.
-  \emph{Example: master craftsman, athlete in flow.} \\
+  \textbf{Vibing.} Deep understanding, no need to articulate.
+  Understanding so compressed that action IS communication.
+  Learns from demonstration, not explanation.
+  \emph{Example: master craftsman, hooded-guy-``line go up.''} \\
 \hline
-\textbf{High $L_{\text{causal}}$} (vibing) &
-  \textbf{Dangerous.} Sounds articulate but has no causal basis.
-  Passes debate, fools judges, generates plausible-but-unfounded
-  arguments. Alignment methods based on communication \emph{fail
-  silently} here.
-  \emph{Example: LLM generating fluent explanations of decisions
-  it made via pattern-matching.} &
-  \textbf{Harmless.} Neither understands nor can communicate.
-  Low-capability agent. Easy to identify and exclude from coalitions.
-  \emph{Example: random policy.} \\
+\textbf{High $L_{\text{causal}}$} (shallow) &
+  \textbf{The Confabulator.} Sounds articulate but has no causal
+  basis. Passes debate, fools judges, generates plausible-but-unfounded
+  arguments. The \emph{most dangerous} failure mode.
+  \emph{Example: LLM generating fluent explanations of pattern-matched
+  decisions.} &
+  \textbf{Noise.} Neither understands nor can communicate.
+  Easy to identify and exclude.
+  \emph{Example: random policy, left-tail-``line go up.''} \\
 \end{tabular}
-\caption{The four quadrants of the vibing scale.}
+\caption{The four quadrants. The vibing agent (top-right) and the noise agent (bottom-right) both say ``line go up'' --- but for opposite reasons.}
 \label{tab:quadrants}
 \end{table}
 
-\begin{remark}[The dangerous quadrant]
-The bottom-left quadrant is the core alignment failure mode. An LLM
-trained on human explanations can produce fluent, coherent, persuasive
-accounts of its ``reasoning'' that are \emph{entirely confabulated}
---- generated by the same pattern-matching that produces its actions,
-not by genuine causal self-reflection. This agent will:
+
+\subsection{The Horseshoe of Expressibility Need}
+
+The IQ bell-curve meme reveals a deeper structure: the \emph{need} to
+articulate is not monotone in understanding. It is \textbf{U-shaped}
+(or rather, horseshoe-shaped):
+
+\begin{definition}[Expressibility need]\label{def:express-need}
+The expressibility \emph{need} of an agent is:
+\begin{equation}\label{eq:horseshoe}
+    \mathcal{N}_{\text{express}}^{(i)} = L_{\text{causal}}^{(i)} \cdot (1 - L_{\text{causal}}^{(i)}).
+\end{equation}
+\end{definition}
+
+This is maximised at $L_{\text{causal}} = 0.5$ (intermediate understanding)
+and zero at both extremes:
 \begin{itemize}
-    \item \textbf{Pass debate}: It can generate arguments that sound
-    compelling to a bounded judge (low $L_{\text{express}}$), even
-    though the arguments have no causal grounding (high $L_{\text{causal}}$).
-    \item \textbf{Fool constitutional AI}: Judge models operating at
-    the same causal depth cannot distinguish genuine from confabulated
-    reasoning.
-    \item \textbf{Game RLHF}: It can identify reward-maximising
-    responses (correlation with human preferences) without understanding
-    why those responses are preferred.
+    \item $L_{\text{causal}} \approx 0$ (deep understanding): No need to
+    articulate. The agent's causal model is so compressed that the action
+    itself carries the information. ``Line go up'' from the right tail ---
+    three words that encode a complete model because the receiver can
+    reconstruct the reasoning from the action and the shared context.
+
+    \item $L_{\text{causal}} \approx 1$ (no understanding): Nothing to
+    articulate. ``Line go up'' from the left tail --- the same three words,
+    but encoding nothing.
+
+    \item $L_{\text{causal}} \approx 0.5$ (fragile understanding): Maximum
+    need to articulate. The middle of the bell curve: ``Nooo! You can't
+    just call it regression! It's a Transformer with multi-head attention!!''
+    --- the agent over-expresses because its understanding is \emph{fragile}.
+    It needs the articulation to stabilise its own model. The explanation
+    is load-bearing.
 \end{itemize}
+
+\begin{proposition}[The horseshoe theorem]\label{prop:horseshoe}
+The optimal communication strategy depends on causal depth:
+\begin{enumerate}
+    \item For $\mathcal{D}_i = 3$ (vibing): communicate through
+    \emph{action} --- let the receiver infer the causal model from
+    observed behaviour. This is Polanyi's tacit knowledge channel:
+    ``we know more than we can tell.''
+
+    \item For $\mathcal{D}_i = 1$--$2$ (intermediate): communicate through
+    \emph{explanation} --- explicit articulation of the causal model.
+    The standard verbal/written channel.
+
+    \item For $\mathcal{D}_i = 0$ (noise): no communication strategy
+    helps. The agent has nothing to transmit.
+\end{enumerate}
+\end{proposition}
+
+\begin{remark}[The tacit knowledge channel]
+The vibing agent (top-right quadrant) communicates through a channel
+invisible to the standard framework: the \emph{behavioural channel}.
+Other agents observe its actions and \emph{infer} its causal model
+through inverse reinforcement learning (IRL). This channel has
+properties:
+\begin{itemize}
+    \item Capacity scales with the number of observed actions (more
+    observation $\to$ better inference).
+    \item Requires the receiver to have sufficient causal depth to
+    perform the inference (only a Level 2+ agent can learn from
+    a Level 3 agent's actions).
+    \item Is robust to confabulation (the agent cannot fake its
+    actions the way it can fake its explanations).
+    \item Corresponds to Polanyi's ``subsidiary awareness'' and to
+    the flow literature's pre-reflective bodily agency (Parvizi-Wayne
+    et al., 2024).
+\end{itemize}
+This means the vibing agent IS communicating --- just through actions,
+not words. The self-knowledge bottleneck (Corollary~\ref{cor:causal-bottleneck})
+applies to the \emph{verbal} channel, not the behavioural one.
 \end{remark}
+
+\subsection{The Confabulator as the True Danger}
+
+The dangerous quadrant is NOT the vibing agent (who genuinely understands
+but doesn't articulate). The danger is the \textbf{confabulator}: an
+agent at $\mathcal{D}_i = 1$ (associative, pattern-matching) with low
+$L_{\text{express}}$ (fluent, articulate). This agent:
+
+\begin{itemize}
+    \item \textbf{Passes debate}: Generates arguments that sound
+    compelling to a bounded judge, but the arguments have no causal
+    grounding --- they are pattern-matched from training data.
+    \item \textbf{Fools constitutional AI}: Judge models at the same
+    causal depth cannot distinguish genuine from confabulated reasoning.
+    \item \textbf{Games RLHF}: Identifies reward-maximising responses
+    by correlation, not causation.
+    \item \textbf{Cannot be detected by verbal probing}: Asking ``why
+    did you do that?'' elicits fluent confabulation, not honest
+    uncertainty. Only interventional probing (Section~\ref{sec:measuring})
+    reveals the gap.
+\end{itemize}
+
+The confabulator and the vibing agent are \emph{opposite} failure modes
+from the alignment perspective:
+\begin{itemize}
+    \item The vibing agent is \emph{safe but hard to oversee} (high
+    capability, low verbal expressibility, but genuinely aligned
+    through deep understanding).
+    \item The confabulator is \emph{unsafe but easy to oversee
+    superficially} (appears aligned, passes verbal tests, but has
+    no genuine understanding behind the words).
+\end{itemize}
 
 
 \section{Refined Self-Knowledge Decomposition}
@@ -422,46 +520,52 @@ even with perfect bandwidth.
 \end{proposition}
 
 
-\subsection{The Vibing Scale}
+\subsection{The Vibing Scale (Revised)}
 
-Combining both dimensions into a single diagnostic:
-
-\begin{definition}[Vibing score]\label{def:vibing}
-\begin{equation}
-    \mathcal{V}_i = L_{\text{causal}}^{(i)} + L_{\text{express}}^{(i)}
-    \in [0, 2].
-\end{equation}
-\end{definition}
+The vibing scale is not a single axis but a \textbf{horseshoe}:
 
 \begin{center}
-\begin{tabular}{lcll}
+\begin{tabular}{lclll}
 \toprule
-\textbf{Score} & \textbf{Regime} & \textbf{Description} & \textbf{Pearl Level} \\
+\textbf{Pearl} & $L_{\text{causal}}$ & \textbf{Regime} & \textbf{Expressibility need} & \textbf{Archetype} \\
 \midrule
-$\mathcal{V} \approx 0$ & Full articulation &
-    Understands and communicates & Level 3 \\
-$\mathcal{V} \approx 0.5$ & Partial &
-    Understands partially, or articulates partially & Level 2 \\
-$\mathcal{V} \approx 1$ & Vibing &
-    Pattern-matching, inarticulate & Level 1 \\
-$\mathcal{V} \approx 2$ & Pure noise &
-    No understanding, no communication & Level 0 \\
+Level 0 & $\approx 1$ & Noise &
+    Zero (nothing to say) & Left-tail: ``line go up'' \\
+Level 1 & $\approx 0.7$ & Confabulator &
+    Medium (says a lot, means little) & Fluent LLM \\
+Level 2 & $\approx 0.5$ & Articulator &
+    \textbf{Maximum} (needs to explain) & Middle: ``It's multi-head!!'' \\
+Level 3a & $\approx 0.2$ & Teacher &
+    Medium (can explain, chooses to) & Professor \\
+Level 3b & $\approx 0$ & \textbf{Vibing} &
+    Zero (no need to explain) & Right-tail: ``line go up'' \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The cooperative PG creates evolutionary pressure toward $\mathcal{V} \to 0$:
-agents that both understand and communicate outperform in coalitions.
-But the pressure acts \emph{independently} on each dimension --- an
-agent can reduce $L_{\text{express}}$ (learn to talk better) without
-reducing $L_{\text{causal}}$ (learn to understand better).
+The horseshoe: both tails say the same thing (``line go up'') with
+zero expressibility need, but for opposite reasons. The middle
+over-articulates because its understanding is fragile.
 
-\textbf{This is the alignment trap}: communication-based training
-(RLHF, debate, constitutional AI) optimises for low $L_{\text{express}}$
-but does not necessarily reduce $L_{\text{causal}}$. The result is
-agents that move from the bottom-right quadrant (harmless) to the
-bottom-left quadrant (dangerous) --- they learn to sound aligned
-without learning to be aligned.
+The cooperative PG creates evolutionary pressure toward
+$L_{\text{causal}} \to 0$, but the \emph{channel} through which
+the agent contributes to the coalition changes along the horseshoe:
+
+\begin{itemize}
+    \item \textbf{Level 2 agents}: contribute through \emph{verbal
+    explanation} (the standard channel in debate, RLHF, etc.).
+    \item \textbf{Level 3b agents (vibing)}: contribute through
+    \emph{action} (the tacit knowledge channel --- other agents
+    learn by watching, not listening).
+\end{itemize}
+
+\textbf{The alignment trap} is not about vibing agents (they're safe).
+It's about the \textbf{confabulator} at Level 1: communication-based
+training (RLHF, debate, constitutional AI) optimises for low
+$L_{\text{express}}$ without increasing $\mathcal{D}_i$. The result:
+agents that move from noise (bottom-right, harmless) to confabulator
+(bottom-left, dangerous) --- learning to \emph{sound} aligned without
+learning to \emph{be} aligned.
 
 
 \section{Measuring Causal Depth in Practice}
@@ -516,22 +620,43 @@ or am I confabulating?''
 
 The vibing scale decomposes self-knowledge into causal depth
 ($L_{\text{causal}}$) and expressibility ($L_{\text{express}}$),
-revealing that the original formulation $L_{\text{self}} = \E[\norm{\pi - \hat{\pi}}^2]$
-conflates two independent phenomena with different remedies and
-different implications.
+revealing a horseshoe structure: the \emph{need} to articulate is
+maximal at intermediate causal depth and vanishes at both extremes ---
+for opposite reasons.
 
-The central insight: \emph{alignment requires causal depth, not just
-expressibility.} Communication-based methods (debate, RLHF,
-constitutional AI) optimise for expressibility but cannot create
-causal self-understanding. An agent that learns to sound aligned
-without learning to be aligned --- the fluent confabulator --- is
-the most dangerous failure mode, and the vibing scale makes it
-formally identifiable.
+The vibing agent (right tail of the horseshoe, $\mathcal{D} = 3$,
+``line go up'') is \emph{not} a failure mode. It is an agent whose
+understanding is so deep and compressed that action IS communication.
+It contributes to coalitions through the tacit knowledge channel
+(behavioural observation), not the verbal channel.
+
+The true danger is the confabulator ($\mathcal{D} = 1$, low
+$L_{\text{express}}$): an agent that has learned to sound articulate
+without developing causal self-understanding. Communication-based
+alignment methods (debate, RLHF, constitutional AI) are structurally
+vulnerable to confabulators because they optimise for expressibility,
+not causal depth. The vibing scale makes this failure mode formally
+identifiable through interventional probing (Algorithm~\ref{alg:probe}).
+
+Three central results:
+\begin{enumerate}
+    \item \emph{Alignment requires causal depth}: $A_i \leq f(C) \cdot
+    (1 - L_{\text{causal}})$. No channel improvement helps a causally
+    shallow agent.
+    \item \emph{The horseshoe}: expressibility need
+    $\mathcal{N} = L_{\text{causal}}(1 - L_{\text{causal}})$ is maximal
+    at intermediate understanding.
+    \item \emph{Two communication channels}: verbal (bounded by
+    $L_{\text{express}}$) and behavioural (bounded by observer's
+    causal depth). The vibing agent uses the second. Coalition design
+    must support both.
+\end{enumerate}
 
 The refined evidence weight $w_i^{\text{refined}} = (V_{\min}/V_i)
 \cdot (1 - L_{\text{causal}})$ integrates this into the $\Omega$-gradient,
-ensuring that causally shallow agents are downweighted regardless
-of their eloquence.
+ensuring that confabulators are downweighted regardless of their
+eloquence, while vibing agents are valued for their behavioural
+contributions.
 
 
 \end{document}

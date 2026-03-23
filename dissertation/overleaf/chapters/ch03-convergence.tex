@@ -509,6 +509,10 @@ Even with a perfect channel, $L_{\text{comm}}^{(i \to j)} \leq 2 V_i$. An agent 
 
 The evidence weight $w_i$ thus does \emph{triple duty}: gradient quality (\S\ref{sec:ewpg}), self-knowledge (Proposition~\ref{prop:self-ev-ch3}), and communication quality (Theorem~\ref{thm:comm-decomp}). All three are manifestations of $I(\pi_i; \mathcal{O}_i)$.
 
+\begin{remark}[The vibing horseshoe]
+The self-knowledge loss further decomposes into \emph{causal depth} $L_{\text{causal}}$ (does the agent understand why it acts?) and \emph{expressibility} $L_{\text{express}}$ (can it communicate that understanding?). The need to articulate is horseshoe-shaped: $\mathcal{N}_{\text{express}} = L_{\text{causal}}(1 - L_{\text{causal}})$, maximal at intermediate understanding. A ``vibing'' agent with $L_{\text{causal}} \approx 0$ (deep causal self-knowledge) needs no verbal explanation --- it communicates through action. The dangerous failure mode is the \emph{confabulator}: low $L_{\text{express}}$ (fluent) but high $L_{\text{causal}}$ (causally shallow). See the companion paper for the full development.
+\end{remark}
+
 The cooperative PG update augments each agent's gradient with a coalition correction:
 \begin{equation}
 \label{eq:coop-update-ch3}

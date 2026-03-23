@@ -165,15 +165,26 @@ Both the opponent-shaping and cooperative terms address the G\"odel-limited risk
 When both channels are available, they provide complementary information. Only terms in $B_{\min}$ (the irreducible collective blind spot) remain permanently inaccessible.
 
 
-\section{The ``Vibing'' Spectrum}
+\section{The Vibing Scale: A Horseshoe, Not a Line}
 
-The $\mathcal{O} \to \Pi$ mapping defines a spectrum:
-\[
-    \underbrace{\text{Full articulation}}_{\substack{L_{\text{self}} \approx 0 \\ \text{Pearl Level 3}}}
-    \quad\longleftrightarrow\quad
-    \underbrace{\text{Pure vibing}}_{\substack{L_{\text{self}} \approx V_{\max} \\ \text{Pearl Level 1}}}
-\]
+The self-knowledge loss $L_{\text{self}}$ decomposes into two independent dimensions: \emph{causal depth} $L_{\text{causal}}$ (does the agent have an internal causal model of its decisions?) and \emph{expressibility} $L_{\text{express}}$ (can it communicate that model?).
 
-The cooperative PG creates \emph{evolutionary pressure toward articulability}: agents that can communicate their policies contribute more to coalitions, receive higher coalition payoff, and are preferred as coalition partners.
+The need to articulate follows a \textbf{horseshoe}: $\mathcal{N}_{\text{express}} = L_{\text{causal}} \cdot (1 - L_{\text{causal}})$, maximal at intermediate understanding:
 
-This formalises the claim that multi-agent interaction drives agents up Pearl's causal hierarchy.
+\begin{center}
+\begin{tabular}{lcl}
+\toprule
+\textbf{Pearl Level} & $L_{\text{causal}}$ & \textbf{Regime} \\
+\midrule
+Level 0 (noise) & $\approx 1$ & Nothing to say. ``Line go up.'' (left tail) \\
+Level 1--2 (intermediate) & $\approx 0.5$ & Maximum expressibility need. ``It's multi-head attention!!'' \\
+Level 3 (vibing) & $\approx 0$ & No need to explain. ``Line go up.'' (right tail) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The vibing agent ($\mathcal{D} = 3$) is NOT a failure mode --- its understanding is so deep and compressed that action IS communication. It contributes to coalitions through the \emph{tacit knowledge channel}: other agents learn by observing its behaviour (inverse RL), not by listening to its explanations.
+
+The true danger is the \textbf{confabulator} ($\mathcal{D} = 1$, low $L_{\text{express}}$): fluently articulate but causally shallow. Communication-based alignment (debate, RLHF, constitutional AI) optimises for low $L_{\text{express}}$ without increasing causal depth --- producing agents that sound aligned without being aligned. The vibing scale (detailed in companion paper) makes this failure mode formally identifiable through interventional probing.
+
+The cooperative PG creates evolutionary pressure toward $L_{\text{causal}} \to 0$ (deeper causal self-knowledge), but the \emph{channel} through which agents contribute shifts along the horseshoe: verbal explanation at intermediate depth, behavioural demonstration at high depth.
