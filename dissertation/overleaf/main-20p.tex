@@ -41,7 +41,7 @@ Learning in multi-agent stochastic games is fundamentally harder than single-age
 
 Giannou et al.~\cite{giannou2022} established local convergence of policy gradient methods to Nash equilibria in \emph{general} stochastic games, with an $\mathcal{O}(1/\sqrt{n})$ rate for second-order stationary (SOS) policies under REINFORCE. This dissertation asks: \emph{can we do better?}
 
-We introduce four modifications, each addressing a distinct source of suboptimality:
+We introduce five modifications, each addressing a distinct source of suboptimality:
 
 \begin{enumerate}
     \item \textbf{Evidence-weighted policy gradient (EW-PG).} Agents scale gradient updates by a Keynesian evidence weight $w_i = V_{\min}/V_i$. The effective variance improves by $\operatorname{HM}(V)/\operatorname{AM}(V) \leq 1$. The rate exponent is preserved; the improvement is in the leading constant.
@@ -51,9 +51,11 @@ We introduce four modifications, each addressing a distinct source of suboptimal
     \item \textbf{Cooperative PG with lossy communication.} Agents in coalitions share policy information through lossy channels. The \emph{self-knowledge bottleneck}: communication quality is bounded by evidence quality ($L_{\text{comm}} \leq 2V_i + 2L_{\text{ch}}$). The evidence weight $w_i$ does triple duty: gradient quality, self-knowledge, and communication quality.
 
     \item \textbf{Sparse regularisation and the blessing of dimensionality.} For $k$-sparse optimal policies in $d$-dimensional action spaces, L1-regularised EW-PG achieves $O(k \log(d/k))$ sample complexity via concentration of measure and sparse recovery.
+
+    \item \textbf{Fixed-point NE search (FP-NE).} A meta-algorithm discovering Nash equilibria as fixed points of the smoothed best-response map $\mathrm{BR}_\tau$ (a Banach contraction for $\tau > M$), with Bayesian stopping via Good-Turing estimators. All selfish agents benefit from thorough search --- cooperation emerges from the topology of the fixed-point set (Appendix~\ref{app:fpne}).
 \end{enumerate}
 
-All four compose into the $\Omega$-gradient:
+All five compose into the $\Omega$-gradient:
 \begin{equation}
     \pi_{i,n+1} = \proj_\Pi\bigl(\pi_{i,n} + \gamma_n \cdot w_{i,n} \cdot (\hat{v}_{i,n} + \lambda_n \cdot \text{OS}_{i,n} + \beta_n \cdot \text{coop}_{i,n})\bigr)
 \end{equation}
@@ -130,7 +132,7 @@ We validate the four main results on $N$-player matrix games. Full experimental 
 \chapter{Conclusion}
 \label{ch:conclusion}
 
-We extended the convergence framework of Giannou et al.~\cite{giannou2022} with four orthogonal modifications composing into the $\Omega$-gradient: evidence weighting ($\operatorname{HM}/\operatorname{AM}$ variance improvement), opponent shaping (basin enlargement $\mu \to \mu + \lambda\mu_H$), cooperative communication (self-knowledge bottleneck, coalition formation), and sparse regularisation (blessing of dimensionality, $O(k \log d)$ scaling). All results are formalised in Lean~4 and validated experimentally. Applications to federated learning, RLHF alignment, and multi-agent debate demonstrate the framework's breadth (Appendix~\ref{app:applications}).
+We extended the convergence framework of Giannou et al.~\cite{giannou2022} with five orthogonal modifications composing into the $\Omega$-gradient: evidence weighting ($\operatorname{HM}/\operatorname{AM}$ variance improvement), opponent shaping (basin enlargement $\mu \to \mu + \lambda\mu_H$), cooperative communication (self-knowledge bottleneck, coalition formation), sparse regularisation (blessing of dimensionality, $O(k \log d)$ scaling), and fixed-point NE search (Bayesian exploration of the equilibrium set via Banach contraction). All results are formalised in Lean~4 and validated experimentally on one-shot matrix games, fixed-point NE discovery, and iterated games adapted from Kim et al.~\cite{kim2021policygradientalgorithmlearning}. Applications to federated learning, RLHF alignment, and multi-agent debate demonstrate the framework's breadth (Appendix~\ref{app:applications}).
 
 \paragraph{Limitations.} The heterogeneous variance model is validated empirically but a derivation from the score-function estimator for general stochastic games remains open. The spectral and cooperative reinforcement conditions are domain-dependent. All improvements are local (within the SOS ball). The sparse recovery bounds assume exact sparsity; extending to approximate sparsity requires robust recovery theory.
 
@@ -141,6 +143,8 @@ We extended the convergence framework of Giannou et al.~\cite{giannou2022} with 
     \item \emph{Parametric policies}: neural-network-parametrised policies connecting to deep MARL.
     \item \emph{Dynamic coalitions}: online learning of when to cooperate and when to compete.
     \item \emph{Active inference connection}: formalising the relationship between the evidence weight and precision-weighting in predictive processing.
+    \item \emph{FP-NE homotopy}: tracking QRE bifurcations as $\tau \to 0$ to map the full equilibrium correspondence; connections to catastrophe theory.
+    \item \emph{Meta-learning + FP-NE}: integrating trajectory-level meta-optimisation (Meta-MAPG) with fixed-point search to escape defection equilibria in iterated games.
 \end{enumerate}
 
 
@@ -161,6 +165,8 @@ We extended the convergence framework of Giannou et al.~\cite{giannou2022} with 
 
 \input{chapters/ch13-applications}
 
+\input{chapters/ch14-fixed-point-ne}
+
 \chapter{Lean Formalisation}
 \label{app:lean}
 
@@ -169,6 +175,7 @@ All main results have been formalised in Lean~4 with Mathlib dependencies:
     \item \texttt{EvidenceWeightedPG.lean} --- energy inequality, AM-HM bound, variance ratio.
     \item \texttt{OpponentShapingPG.lean} --- bias absorption, annealing compatibility, basin enlargement.
     \item \texttt{CooperativePG.lean} --- communication loss decomposition, coalition bounds, full $\Omega$-PG.
+    \item \texttt{FixedPointNE.lean} --- BR$_\tau$ contraction, Banach uniqueness, exploration value bound.
 \end{itemize}
 
 \section{What Is Verified}
