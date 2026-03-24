@@ -97,7 +97,7 @@ class MetaMAPGTrainer:
         game: TradeNetworkGame,
         inner_steps: int = 3,
         n_trajectories: int = 8,
-        meta_lr: float = 0.005,
+        meta_lr: float = 0.02,
         include_term2: bool = True,
         include_term3: bool = True,
     ) -> None:
@@ -450,6 +450,10 @@ class MetaMAPGTrainer:
         more trade between Nigeria and Ghana → stronger coupling →
         larger Term 3 contribution.
 
+        Normalised by agent i's OWN total trade (not network total),
+        giving the fraction of agent i's trade that flows to/from peer j.
+        This is the local perspective: "how much does peer j matter to me?"
+
         This is where the network structure enters the MARL gradient:
         the topology determines which agents affect each other's learning.
         """
@@ -467,17 +471,19 @@ class MetaMAPGTrainer:
                     shared_volume += data.get("volume", 0.0)
                     shared_edges += 1
 
-        # Normalise by total trade volume
-        total_volume = sum(
-            d.get("volume", 0.0) for _, _, d in g.G.edges(data=True)
-            if d.get("edge_type") == "TRADE"
-        )
+        # Normalise by agent i's total trade volume (local perspective)
+        agent_volume = 0.0
+        for u, v, data in g.G.edges(data=True):
+            if data.get("edge_type") == "TRADE":
+                if u in agent_cities or v in agent_cities:
+                    agent_volume += data.get("volume", 0.0)
 
-        if total_volume < 1e-10:
-            return 0.0
+        if agent_volume < 1e-10:
+            # Fallback: use edge connectivity (1 if any shared edge, 0 otherwise)
+            return 1.0 if shared_edges > 0 else 0.0
 
-        # Coupling = shared trade fraction, bounded [0, 1]
-        return min(shared_volume / total_volume, 1.0)
+        # Coupling = fraction of agent i's trade going to peer j, bounded [0, 1]
+        return min(shared_volume / agent_volume, 1.0)
 
 
 def run_ablation(

@@ -76,7 +76,7 @@ class TradeAgent:
     # Policy parameters: (n_obs_features, n_actions)
     phi: np.ndarray = field(default=None)
     # Learning rate (alpha^i in eq. 5.2)
-    lr: float = 0.01
+    lr: float = 0.05
 
     def __post_init__(self):
         if self.phi is None:
