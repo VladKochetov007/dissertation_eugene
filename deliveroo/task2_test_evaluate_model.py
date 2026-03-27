@@ -1,9 +1,8 @@
-"""Tests for evaluate_model. Run with: python -m pytest test_evaluate_model.py -v"""
+"""Tests for evaluate_model. Run with: python -m unittest task2_test_evaluate_model -v"""
 
 import math
 import sys
 import unittest
-from unittest.mock import patch
 
 # Stub pipeline_utils so we can import evaluate_model without the real package
 import types
@@ -17,7 +16,7 @@ pipeline_utils.config = config_module
 sys.modules["pipeline_utils"] = pipeline_utils
 sys.modules["pipeline_utils.config"] = config_module
 
-from evaluate_model import ModelPerformanceError, _clip, _log_loss, evaluate_model
+from task2_evaluate_model import ModelPerformanceError, _clip, _log_loss, evaluate_model
 
 
 class TestClip(unittest.TestCase):
@@ -107,7 +106,7 @@ class TestEvaluateModel(unittest.TestCase):
 
     def test_threshold_boundary(self):
         """Loss exactly at threshold should pass (not strictly greater)."""
-        import evaluate_model as em
+        import task2_evaluate_model as em
 
         known_loss = _log_loss([1, 0], [0.5, 0.5])  # = log(2)
         original = em.MODEL_PERF_THRESHOLD

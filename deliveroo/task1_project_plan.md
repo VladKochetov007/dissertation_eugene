@@ -106,4 +106,19 @@ Restaurant staff and experienced riders hold valuable tacit knowledge about prep
 - **Offline evaluation**: Replay historical orders with the new model's predictions feeding into the dispatch simulator. Compare rider wait times, early/late rates against the baseline model.
 - **Online evaluation (A/B test)**: Roll out to a random subset of restaurants/cities. Measure rider wait time, customer ratings, and rider efficiency (deliveries per hour) against the control group using the existing model. Statistical significance via standard two-sample tests with correction for clustering by restaurant.
 
+### Model Explainability
+
+A prep-time model serves two audiences beyond the dispatch system: **restaurant partners** who need to understand why their estimates differ from expectations, and **internal teams** (ops, product) who need to trust and debug the model.
+
+- **Feature importance (global):** SHAP summary plots identify which features drive predictions across all orders. If `concurrent_order_count` dominates, that validates our busyness engineering. If `restaurant_id` dominates, the model is leaning on memorisation rather than generalisable patterns — a signal to invest in better features.
+- **Individual explanations (local):** For any single order, SHAP waterfall plots show how each feature pushed the prediction above or below the baseline. This powers a restaurant-facing insight: *"Your estimated prep time was 25 min because: +8 min from 6 concurrent orders, +4 min from Friday dinner rush, -2 min from your typically fast kitchen."*
+- **Partial dependence plots:** Visualise the marginal effect of key features (e.g. how does prep time change as concurrent orders increase from 1 to 10?). These reveal non-linearities — perhaps prep time scales linearly up to 5 concurrent orders then jumps sharply, suggesting a kitchen capacity bottleneck.
+- **Monitoring via explanations:** If SHAP feature importance shifts significantly between retraining cycles (e.g. `type_of_food` suddenly becomes dominant), that flags a distribution shift worth investigating.
+
+Explainability is not a post-hoc add-on — it is integral to building trust with restaurant partners and ensuring the model remains debuggable as it scales across markets.
+
+**Asymmetric loss consideration:** Overestimating prep time (rider waits) and underestimating (food waits) have different costs. Rider idle time is expensive; cold food damages retention. The optimal prediction may not be the mean but a specific quantile — e.g. the 60th percentile if late riders are costlier than idle ones. The quantile regression variant in Stage 2 allows tuning this trade-off directly.
+
 **Iteration criteria:** Progress from Stage 1 → 2 → 3 → 4 only if the previous stage's improvements justify complexity. If Stage 2 (gradient-boosted trees) achieves <15% MAE improvement over Stage 1, investigate feature engineering before adding model complexity.
+
+**Monitoring and retraining:** Restaurant behaviour drifts — menus change, staff turns over, new competitors open nearby. The model should be retrained on a rolling window (e.g. weekly) and monitored for per-restaurant prediction drift. If a restaurant's MAE exceeds 2x the population median for two consecutive weeks, flag it for investigation. This closes the loop: the model improves continuously rather than degrading silently.

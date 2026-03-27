@@ -84,69 +84,74 @@ import os
 import pdb
 
 from __future__ import division
-numerical_average = lambda x, y, alpha: x / y
+numerical_average = lambda x, y, alpha: x/y
 
 def customerCategoricalFeature(cc):
-    if cc == "High":
-        return 1
-    elif cc == "Medium":
-        return 2
-    elif cc == "Low":
-        return 3
+   if cc == "High":
+       return 1
+   elif cc == "Medium":
+       return 2
+   elif cc == "Low":
+       return 3
 
 def customerCountryFeature(cc):
-    if cc == "UK":
-        return 1
-    elif cc == "Frances":
-        return 2
-    elif cc == "Australia":
-        return 3
+   if cc == "UK":
+       return 1
+   elif cc == "Frances":
+       return 2
+   elif cc == "Australia":
+       return 3
 
 def features(customer_data):
-    if "customer_id" not in customer_data.keys() or type(customer_data["customer_id"]) != int:
-        customer_features = {
-            "customer_id": -1
-        }
-    else:
-        customer_features = {
-            "customer_id": customer_data["customer_id"]
-        }
 
-    list = [
-        customerCategoricalFeature(customer_data["customer_value"]),
-        customerCountryFeature(customer_data["customer_country"]),
-    ]
+   if "customer_id" not in customer_data.keys() or type(customer_data["customer_id"]) != int:
+       customer_features = {
+           "customer_id": -1
+       }
+   else:
+       customer_features = {
+           "customer_id": customer_data["customer_id"]
+       }
 
-    if 0 in customer_data["global_visit_count"]:
-        raise Exception("Denominators shouldn't be 0")
+   list = [
+       customerCategoricalFeature(customer_data["customer_value"]),
+       customerCountryFeature(customer_data["customer_country"]),
+   ]
 
-    try:
-        # pdb.set_trace()
-        customer_features["numerical_averages"] = list()
-        for index in range(len(customer_data["global_order_count"])):
-            customer_features["numerical_averages"].append(numerical_average(
-                customer_data["global_order_count"][index],
-                customer_data["global_visit_count"][index]
-            ))
-    except:
-        customer_features["numberical_averages"] = []
+   if 0 in customer_data["global_visit_count"]:
+       raise Exception("Denominators shouldn't be 0")
 
-    customer_features["categorical_features"] = list
-    return customer_features
+   try:
+       # pdb.set_trace()
+
+       customer_features["numerical_averages"] = list()
+       for index in range(len(customer_data["global_order_count"])):
+           customer_features["numerical_averages"].append(numerical_average(
+               customer_data["global_order_count"][index],
+               customer_data["global_visit_count"][index]
+           ))
+   except:
+       customer_features["numberical_averages"] = []
+
+   customer_features["categorical_features"] = list
+   return customer_features
 
 def processDataFile(input_filename, output_filename):
-    if os.access(input_filename, os.R_OK):
-        with open(input_filename, "r") as f:
-            input_data = f.readlines()
-        g = open(output_filename, 'w')
-        for x in input_data:
-            g.write(dumps(features(loads(x))) + "\n")
-        g.close()
-    else:
-        print("Input file can't be accessed")
+
+   if os.access(input_filename, os.R_OK):
+       with open(input_filename, "r") as f:
+           input_data = f.readlines()
+
+           g = open(output_filename, 'w')
+           for x in input_data:
+               g.write(dumps(features(loads(x))) + "\n")
+           g.close()
+   else:
+       print("Input file can't be accessed")
 
 input_filename = sys.argv[1]
 output_filename = sys.argv[2]
+
 print(f"processing features for file: {input_filename}")
 processDataFile(input_filename, output_filename)
 \end{lstlisting}
@@ -161,11 +166,11 @@ I verified the review against the provided test data (\texttt{input.txt}). The s
 \end{bugbox}
 
 \begin{bugbox}
-\bug \lineno{38} Assigning to the name \texttt{list} shadows Python's built-in \texttt{list} type. This directly causes a \texttt{TypeError} on line~48, where \texttt{list()} is intended to create an empty list but instead tries to call the local variable (a list of two integers) as a function. Rename to \texttt{categorical\_features}.
+\bug \lineno{37} Assigning to the name \texttt{list} shadows Python's built-in \texttt{list} type. This directly causes a \texttt{TypeError} on line~48, where \texttt{list()} is intended to create an empty list but instead tries to call the local variable (a list of two integers) as a function. Rename to \texttt{categorical\_features}.
 \end{bugbox}
 
 \begin{bugbox}
-\bug \lineno{48} Consequence of line~38: \texttt{list()} raises \texttt{TypeError: 'list' object is not callable}. The \texttt{numerical\_averages} key is never populated for any record. The bare \texttt{except} on line~54 silently swallows this error, so the bug manifests as missing data rather than a crash --- the worst kind of failure.
+\bug \lineno{48} Consequence of line~37: \texttt{list()} raises \texttt{TypeError: 'list' object is not callable}. The \texttt{numerical\_averages} key is never populated for any record. The bare \texttt{except} on line~54 silently swallows this error, so the bug manifests as missing data rather than a crash --- the worst kind of failure.
 \end{bugbox}
 
 \begin{bugbox}
@@ -173,7 +178,7 @@ I verified the review against the provided test data (\texttt{input.txt}). The s
 \end{bugbox}
 
 \begin{bugbox}
-\bug \lineno{24} \texttt{"Frances"} is a typo for \texttt{"France"}. All five test records from France silently return \texttt{None} as their country feature because no branch matches.
+\bug \lineno{21} \texttt{"Frances"} is a typo for \texttt{"France"}. All French test records silently return \texttt{None} as their country feature because no branch matches.
 \end{bugbox}
 
 % ─────────────────────────────────────────────────────────────
@@ -188,19 +193,19 @@ I verified the review against the provided test data (\texttt{input.txt}). The s
 \end{issuebox}
 
 \begin{issuebox}
-\issue \lineno{5} \texttt{import pdb} and the commented-out \texttt{pdb.set\_trace()} on line~47 are debugging artefacts. Remove both before merging.
+\issue \lineno{5} \texttt{import pdb} and the commented-out \texttt{pdb.set\_trace()} on line~46 are debugging artefacts. Remove both before merging.
 \end{issuebox}
 
 \begin{issuebox}
-\issue \lineno{9} \texttt{numerical\_average} takes an unused third parameter \texttt{alpha}. Python already supports \texttt{x / y} natively --- there is no need for a lambda wrapper. If a weighted average was intended, implement it; otherwise delete the function entirely and inline the division. Also, PEP~8 discourages assigning lambdas to names --- use \texttt{def} if a function is needed.
+\issue \lineno{8} \texttt{numerical\_average} takes an unused third parameter \texttt{alpha}. Python already supports \texttt{x / y} natively --- there is no need for a lambda wrapper. If a weighted average was intended, implement it; otherwise delete the function entirely and inline the division. Also, PEP~8 discourages assigning lambdas to names --- use \texttt{def} if a function is needed.
 \end{issuebox}
 
 \begin{issuebox}
-\issue \linesno{11}{27} Both \texttt{customerCategoricalFeature} and \texttt{customerCountryFeature} return \texttt{None} implicitly when no branch matches (e.g.\ \texttt{"low"} with lowercase `l' in the test data). This inserts silent \texttt{null}s into the output with no warning.
+\issue \linesno{10}{24} Both \texttt{customerCategoricalFeature} and \texttt{customerCountryFeature} return \texttt{None} implicitly when no branch matches (e.g.\ \texttt{"low"} with lowercase `l' in the test data). This inserts silent \texttt{null}s into the output with no warning.
 \end{issuebox}
 
 \begin{issuebox}
-\issue \lineno{43--44} \texttt{raise Exception(...)} is too broad. Use \texttt{ZeroDivisionError} for semantic clarity. Also, this check sits \emph{outside} the \texttt{try} block, so it crashes the entire pipeline instead of being caught and handled.
+\issue \linesno{42}{43} \texttt{raise Exception(...)} is too broad. Use \texttt{ZeroDivisionError} for semantic clarity. Also, this check sits \emph{outside} the \texttt{try} block, so it crashes the entire pipeline instead of being caught and handled.
 \end{issuebox}
 
 \begin{issuebox}
@@ -208,11 +213,11 @@ I verified the review against the provided test data (\texttt{input.txt}). The s
 \end{issuebox}
 
 \begin{issuebox}
-\issue \linesno{64}{68} The output file \texttt{g} is opened outside a \texttt{with} statement. If line~67 raises an exception, \texttt{g.close()} is never reached, leaving a corrupted partial output. Use a \texttt{with} block.
+\issue \linesno{62}{69} The output file \texttt{g} is opened outside a \texttt{with} statement. If line~68 raises an exception, \texttt{g.close()} is never reached, leaving a corrupted partial output. Use a \texttt{with} block.
 \end{issuebox}
 
 \begin{issuebox}
-\issue \linesno{72}{76} Module-level code runs at import time, making the file impossible to unit-test or reuse. Wrap in \texttt{if \_\_name\_\_ == "\_\_main\_\_":} and add argument validation.
+\issue \linesno{73}{77} Module-level code runs at import time, making the file impossible to unit-test or reuse. Wrap in \texttt{if \_\_name\_\_ == "\_\_main\_\_":} and add argument validation.
 \end{issuebox}
 
 % ─────────────────────────────────────────────────────────────
@@ -232,7 +237,7 @@ def encode_feature(mapping, value):
 \end{suggbox}
 
 \begin{suggbox}
-\suggestion \lineno{28--35} The customer ID check can be simplified to one line using \texttt{dict.get()} and \texttt{isinstance}:
+\suggestion \linesno{28}{35} The customer ID check can be simplified to one line using \texttt{dict.get()} and \texttt{isinstance}:
 \begin{lstlisting}[numbers=none]
 cid = customer_data.get("customer_id")
 customer_features = {"customer_id": cid if isinstance(cid, int) else -1}
