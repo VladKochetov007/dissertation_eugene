@@ -51,31 +51,124 @@
 
 \chapter{Real Notes of Yours Truly}
 
-\textbf{Energy Inequality.} Let $D_n := \|\pi_n - \pi ^ *\| ^2 / 2 = D(\pi_n)$ where $D(\pi) = \frac{1}{2} \| \pi - \pi^*\|^2$ is a local Lyapunov function\footnote{Which is what exactly?}.
+%% ========================================
+%% DEFINITIONS (from whiteboard, left side)
+%% ========================================
 
-\textbf{Lemma A.1.} Let $D_n := D(\pi_n)$. Then for any $n \in \mathbb{N}$,
+\section{Preliminary Definitions}
 
+\textbf{Nash Equilibrium.} $\bar{\pi} = (\bar{\pi}_i)_{i \in \mathcal{I}}$ is a Nash equilibrium if for all $p \in \Delta S$ and $\forall\, i \in \mathcal{I}$:
 \[
-  D_{n+1} \leq D_n + \gamma_n \left < v(\pi_n), \pi_n - \pi^* \right > + \gamma_n \psi _n + \gamma_n \chi_n + \gamma_n^2 \phi_n^2
+  V_i(\bar{\pi}_i, \bar{\pi}_{-i}) \geq V_i(p_i, \bar{\pi}_{-i}) \quad \forall\, p_i \in \Pi_i,\; i \in \mathcal{I}
 \]
 
-which gives us an upper bound on the growth of $D_n$. In this equation, error terms are given by XXX.
+\textbf{Stability.} $\bar{\pi}$ is \textit{stable} if $\langle v(\bar{\pi}),\, \pi - \bar{\pi} \rangle < 0 \quad \forall\, \pi \neq \bar{\pi}$ (sufficient condition).
+
+\textbf{Game.} A (finite) stochastic game is a tuple:
+\[
+  G_s = \bigl(\mathcal{S},\, \mathcal{N},\, \{A_i, R_i\}_{i \in \mathcal{N}},\, P \bigr)
+\]
+where:
+\begin{itemize}
+  \item $\mathcal{S}$ is a finite state space, $\mathcal{N}$ is the set of players
+  \item $A_i = \{1, \ldots, n_i\}$ is the (finite) action set of player $i$
+  \item $R: \mathcal{S} \times \mathcal{A} \to [0,1]$ is the reward function, $p \in \Delta(\mathcal{S})$
+  \item $P(s' | s, a)$ is the transition probability
+  \item Termination probability: $\zeta \triangleq 1 - \sum_{s' \in \mathcal{S}} P(s' | s, a)$;\quad $\zeta = \min_{s \in \mathcal{S},\, a \in \mathcal{A}} \zeta(s,a)$
+\end{itemize}
+
+%% ========================================
+%% THEOREM 1 (from whiteboard, centre top)
+%% ========================================
+
+\section{Main Result}
+
+\textbf{Theorem 1.} For every $\bar{\pi}^*$ stable Nash pair, let $(\tilde{\pi}_n)_{n \in \mathbb{N}}$ be the iterates of (PG) with step size $\gamma_n = \gamma / n^\alpha$. Then:
+
+$\exists\; U \subset B(\bar{\pi}^*)$ with $\|\bar{\pi} - \bar{\pi}^*\|^2 < r$, $\forall\, \delta > 0$, given $\gamma$ small enough:
+\[
+  P\!\left(\tilde{\pi}_n \to \bar{\pi}^* \;\middle|\; \tilde{\pi}_0 \in U\right) \geq 1 - \delta \quad \Longrightarrow \quad \pi_n \to \bar{\pi}^* \text{ a.s.}
+\]
+\textit{(How strong is this?)}
+
+%% ========================================
+%% LEMMA A.1 — ENERGY INEQUALITY
+%% ========================================
+
+\section{Energy Inequality}
+
+\textbf{Energy Inequality.} Let $D_n := \|\pi_n - \pi ^ *\| ^2 / 2 = D(\pi_n)$ where $D(\pi) = \frac{1}{2} \| \pi - \pi^*\|^2$ is a local Lyapunov function\footnote{Which is what exactly?}.
+
+\textbf{Lemma A.1.} Let $D_n \triangleq D(\tilde{\pi}_n) \triangleq \frac{1}{2}\|\tilde{\pi}_n - \pi^*\|^2$. Then for any $n \in \mathbb{N}$,
+
+\[
+  D_{n+1} \leq D_n + \gamma_n \langle v(\pi_n),\, \pi_n - \pi^* \rangle + \gamma_n \xi_n + \gamma_n \chi_n + \gamma_n^2 \psi_n^2
+\]
+
+where the error terms are:
+\[
+  \xi_n \triangleq \langle U_n,\, \tilde{\pi}_n - \pi^* \rangle, \qquad
+  \chi_n = \|\Pi\| \|B_n\|, \qquad
+  \psi_n^2 \triangleq \tfrac{1}{2}\|\hat{V}_r\|
+\]
+
+and the oracle decomposition is:
+\[
+  \hat{v}_n = v(\pi_n) + U_n + b_n
+\]
+with:
+\begin{align*}
+  U_n &= \hat{v}_n - \mathbb{E}[\hat{v}_n \mid \mathcal{F}_n], &\qquad b_n &= \mathbb{E}[\hat{v}_n \mid \mathcal{F}_n] - v(\tilde{\pi}_n) \quad \text{(bias)} \\
+  \mathbb{E}[\|b_n\| \mid \mathcal{F}_n] &\leq B_n, &\qquad \mathbb{E}[\|U_n\|^2 \mid \mathcal{F}_n] &\leq \sigma_n^2 \\
+  B_n &= O(1/n^b), &\qquad \sigma_n &= O(n^{c\varepsilon})
+\end{align*}
 
 Some extra definitions:
 
 \[
-  \| \Pi \| := \max_{\pi, \pi^\' \in \Pi} \| \pi - \pi^\' \|
+  \| \Pi \| \triangleq \max_{\pi,\, \pi' \in \Pi} \| \pi - \pi' \|
 \]
+
+%% ========================================
+%% PROOF OF LEMMA A.1 (whiteboard, right side)
+%% ========================================
 
 \textit{Proof.} By definition of iterates of (PG)\footnote{What is it exactly?}, we have:
 
 \begin{align*}
-  D_{n+1} = \frac{1}{2}\|\pi_{n+1} - \pi^* \|^2 &= \frac{1}{2}\|proj_\Pi(\pi_n + \gamma_n \hat{v_n}) - proj_\Pi(\pi^*)\|^2 \\
-          &\leq \frac{1}{2}\|\pi_n + \gamma_n \hat{v_n} - \pi^*\|^2 \text{ by the non expanding property of projection} \\
-          &= \frac{1}{2}\<\pi_n + \gamma_n \hat{v_n} - \pi^*, \pi_n + \gamma_n \hat{v_n} - \pi^*\> \\
-          &= \frac{1}{2} \<\pi_n - \pi^*, \pi_n - \pi^*\> + \frac{1}{2}2 \<\gamma_n \hat{v_n}, \pi_n - \pi^*\> + \frac{1}{2}2 \<\gamma_n \hat{v_n}, \gamma_n \hat{v_n}\> \\
-          &= \frac{1}{2}\left\|\pi_n - \pi^*\right\|^2 + \gamma_n \<\hat{v_n}, \pi_n - \pi^*\> + \frac{1}{2}\gamma_n^2\|\hat v_n\|^2 \\
-          &= D_n + \gamma_n\< v\<\pi_n
+  D_{n+1} = \frac{1}{2}\|\pi_{n+1} - \pi^*\|^2
+  &= \frac{1}{2}\|\operatorname{proj}_\Pi(\pi_n + \gamma_n \hat{v}_n) - \operatorname{proj}_\Pi(\pi^*)\|^2 \\
+  &\leq \frac{1}{2}\|\pi_n + \gamma_n \hat{v}_n - \pi^*\|^2
+    \quad \text{(non-expansiveness of projection, since $\pi^* \in \Pi$)} \\
+  &= \frac{1}{2}\langle \pi_n + \gamma_n \hat{v}_n - \pi^*,\; \pi_n + \gamma_n \hat{v}_n - \pi^* \rangle \\
+  &= \frac{1}{2}\langle \pi_n - \pi^*,\, \pi_n - \pi^* \rangle
+    + \gamma_n \langle \hat{v}_n,\, \pi_n - \pi^* \rangle
+    + \frac{1}{2}\gamma_n^2 \|\hat{v}_n\|^2 \\
+  &= D_n + \gamma_n \langle \hat{v}_n,\, \pi_n - \pi^* \rangle + \frac{1}{2}\gamma_n^2 \|\hat{v}_n\|^2
 \end{align*}
+
+Now, substituting the oracle decomposition $\hat{v}_n = v(\pi_n) + U_n + b_n$:
+
+\begin{align*}
+  &= D_n + \gamma_n \langle v(\pi_n) + U_n + b_n,\; \pi_n - \pi^* \rangle + \frac{1}{2}\gamma_n^2 \|\hat{v}_n\|^2 \\
+  &= D_n + \gamma_n \langle v(\pi_n),\, \pi_n - \pi^* \rangle
+    + \gamma_n \underbrace{\langle U_n,\, \pi_n - \pi^* \rangle}_{= \xi_n}
+    + \gamma_n \langle b_n,\, \pi_n - \pi^* \rangle
+    + \frac{1}{2}\gamma_n^2 \|\hat{v}_n\|^2
+\end{align*}
+
+By Cauchy--Schwarz:
+\[
+  \langle b_n,\, \pi_n - \pi^* \rangle
+  \leq \|b_n\| \cdot \|\pi_n - \pi^*\|
+  \leq \|B_n\| \cdot \|\Pi\|
+  = \chi_n
+\]
+
+Therefore:
+\[
+  \boxed{D_{n+1} \leq D_n + \gamma_n \langle v(\pi_n),\, \pi_n - \pi^* \rangle + \gamma_n \xi_n + \gamma_n \chi_n + \gamma_n^2 \psi_n^2}
+\]
+\hfill $\square$
 
 \end{document}
