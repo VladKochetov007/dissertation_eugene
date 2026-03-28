@@ -1,0 +1,19 @@
+\contentsline {section}{\numberline {1}Introduction}{2}{section.1}%
+\contentsline {section}{\numberline {2}The Topological Cooperation Theorem}{2}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Setup}{2}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Main Result}{2}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Quantitative Bounds}{3}{subsection.2.3}%
+\contentsline {section}{\numberline {3}Algorithmic Realisation: FP-NE Search}{3}{section.3}%
+\contentsline {section}{\numberline {4}Empirical Validation}{3}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Results}{4}{subsection.4.1}%
+\contentsline {section}{\numberline {5}Application: AI Safety}{4}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Corrigibility}{4}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Deceptive Alignment}{5}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Alignment as Public Good}{5}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}Reward Hacking}{5}{subsection.5.4}%
+\contentsline {subsection}{\numberline {5.5}AI Debate}{6}{subsection.5.5}%
+\contentsline {section}{\numberline {6}Discussion}{6}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Computation as Mechanism}{6}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}Implications for AI Safety}{7}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}Limitations}{8}{subsection.6.3}%
+\contentsline {section}{\numberline {7}Conclusion}{8}{section.7}%

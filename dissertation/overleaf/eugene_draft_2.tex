@@ -1,0 +1,81 @@
+% updated to include natbib bibliography style
+% by Bernhard von Stengel 11 February 2021
+% First we set up the style for the dissertation. Do not change this!
+\documentclass[a4paper,oneside,11pt]{report}
+
+% Now we load the preamble, which sets up most we need for the dissertation.
+\input{template-preamble}
+
+% Bernhard von Stengel 11 Feb 2021: try these fonts (the first is Times,
+% needs less space, the second Palatino)
+% \usepackage{newtxtext,newtxmath}
+\usepackage{newpxtext,newpxmath}
+\usepackage{inconsolata} % a nice fixed-width font for programming, \texttt
+\usepackage{roboto} % a nice sans serif font
+\usepackage{microtype}
+
+% --- ADDED BY GEMINI ---
+\usepackage{float}
+% -----------------------
+
+% The next lines set the title and candidate number. Fill in your own!
+\dissertationtitle{Template for\\
+  the Dissertation in Mathematics}
+
+\candnumber{007}
+
+% vertical skip between paragraphs. Do not use manual skips
+% in the document, only central parameters like this!
+\parskip1ex
+
+% Now the document begins.
+\begin{document}
+
+% First the titlepage.
+
+\dissertationtitlepage
+
+% You are required to write a short summary.
+
+\begin{dissertationsummary}
+
+\end{dissertationsummary}
+
+% Next we set up the table of contents page. This will update
+% automagically, so you do not need to change anything. You may need to run
+% pdflatex two or three times before it all updates correctly though.
+
+\dissertationtableofcontents
+
+% Finally, we can get started 
+
+\chapter{Real Notes of Yours Truly}
+
+\textbf{Energy Inequality.} Let $D_n := \|\pi_n - \pi ^ *\| ^2 / 2 = D(\pi_n)$ where $D(\pi) = \frac{1}{2} \| \pi - \pi^*\|^2$ is a local Lyapunov function\footnote{Which is what exactly?}.
+
+\textbf{Lemma A.1.} Let $D_n := D(\pi_n)$. Then for any $n \in \mathbb{N}$,
+
+\[
+  D_{n+1} \leq D_n + \gamma_n \left < v(\pi_n), \pi_n - \pi^* \right > + \gamma_n \psi _n + \gamma_n \chi_n + \gamma_n^2 \phi_n^2
+\]
+
+which gives us an upper bound on the growth of $D_n$. In this equation, error terms are given by XXX.
+
+Some extra definitions:
+
+\[
+  \| \Pi \| := \max_{\pi, \pi^\' \in \Pi} \| \pi - \pi^\' \|
+\]
+
+\textit{Proof.} By definition of iterates of (PG)\footnote{What is it exactly?}, we have:
+
+\begin{align*}
+  D_{n+1} = \frac{1}{2}\|\pi_{n+1} - \pi^* \|^2 &= \frac{1}{2}\|proj_\Pi(\pi_n + \gamma_n \hat{v_n}) - proj_\Pi(\pi^*)\|^2 \\
+          &\leq \frac{1}{2}\|\pi_n + \gamma_n \hat{v_n} - \pi^*\|^2 \text{ by the non expanding property of projection} \\
+          &= \frac{1}{2}\<\pi_n + \gamma_n \hat{v_n} - \pi^*, \pi_n + \gamma_n \hat{v_n} - \pi^*\> \\
+          &= \frac{1}{2} \<\pi_n - \pi^*, \pi_n - \pi^*\> + \frac{1}{2}2 \<\gamma_n \hat{v_n}, \pi_n - \pi^*\> + \frac{1}{2}2 \<\gamma_n \hat{v_n}, \gamma_n \hat{v_n}\> \\
+          &= \frac{1}{2}\left\|\pi_n - \pi^*\right\|^2 + \gamma_n \<\hat{v_n}, \pi_n - \pi^*\> + \frac{1}{2}\gamma_n^2\|\hat v_n\|^2 \\
+          &= D_n + \gamma_n\< v\<\pi_n
+\end{align*}
+
+\end{document}

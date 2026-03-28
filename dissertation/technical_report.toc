@@ -1,56 +1,69 @@
-\contentsline {section}{\numberline {1}Introduction}{3}{section.1}%
-\contentsline {subsection}{\numberline {1.1}Contributions}{3}{subsection.1.1}%
-\contentsline {subsection}{\numberline {1.2}Relation to Prior Work}{4}{subsection.1.2}%
-\contentsline {section}{\numberline {2}Preliminaries}{4}{section.2}%
-\contentsline {subsection}{\numberline {2.1}Stochastic Games}{4}{subsection.2.1}%
-\contentsline {subsection}{\numberline {2.2}Policy Gradient and REINFORCE}{4}{subsection.2.2}%
-\contentsline {subsection}{\numberline {2.3}The SOS Condition (Giannou et al.)}{4}{subsection.2.3}%
-\contentsline {section}{\numberline {3}Evidence-Weighted Policy Gradient}{5}{section.3}%
-\contentsline {subsection}{\numberline {3.1}Motivation: Heterogeneous Information}{5}{subsection.3.1}%
-\contentsline {subsection}{\numberline {3.2}The Keynesian Evidence Weight}{5}{subsection.3.2}%
-\contentsline {subsection}{\numberline {3.3}Variance Improvement}{5}{subsection.3.3}%
-\contentsline {subsection}{\numberline {3.4}Algorithm}{6}{subsection.3.4}%
-\contentsline {section}{\numberline {4}Opponent-Shaping Policy Gradient}{6}{section.4}%
-\contentsline {subsection}{\numberline {4.1}The LOLA Correction}{6}{subsection.4.1}%
-\contentsline {subsection}{\numberline {4.2}Convergence Results}{6}{subsection.4.2}%
-\contentsline {section}{\numberline {5}Cooperative PG with Lossy Communication}{6}{section.5}%
-\contentsline {subsection}{\numberline {5.1}The Self-Knowledge Problem}{6}{subsection.5.1}%
-\contentsline {subsection}{\numberline {5.2}Communication Loss Decomposition}{7}{subsection.5.2}%
-\contentsline {subsection}{\numberline {5.3}Triple-Duty Evidence Weight}{7}{subsection.5.3}%
-\contentsline {subsection}{\numberline {5.4}Coalition Formation}{7}{subsection.5.4}%
-\contentsline {section}{\numberline {6}The Blessing of Dimensionality}{7}{section.6}%
-\contentsline {subsection}{\numberline {6.1}The Apparent Curse}{7}{subsection.6.1}%
-\contentsline {subsection}{\numberline {6.2}The Blessing: Sparse Recovery}{8}{subsection.6.2}%
-\contentsline {subsection}{\numberline {6.3}The Natural Curriculum}{8}{subsection.6.3}%
-\contentsline {section}{\numberline {7}Fixed-Point Nash Equilibrium Search}{8}{section.7}%
-\contentsline {subsection}{\numberline {7.1}Nash Equilibria as Fixed Points}{8}{subsection.7.1}%
-\contentsline {subsection}{\numberline {7.2}Contraction and the Banach Fixed-Point Theorem}{9}{subsection.7.2}%
-\contentsline {subsection}{\numberline {7.3}Bayesian Exploration of the Fixed-Point Set}{9}{subsection.7.3}%
-\contentsline {subsection}{\numberline {7.4}Cooperation from Selfish Search}{9}{subsection.7.4}%
-\contentsline {subsection}{\numberline {7.5}Integration: FP-NE as Phase~0 of $\Omega $-PG}{10}{subsection.7.5}%
-\contentsline {subsection}{\numberline {7.6}Relation to Meta-Value Learning and Meta-MAPG}{10}{subsection.7.6}%
-\contentsline {section}{\numberline {8}The Complete $\Omega $-Gradient}{10}{section.8}%
-\contentsline {subsection}{\numberline {8.1}Unified Update Rule}{10}{subsection.8.1}%
-\contentsline {subsection}{\numberline {8.2}Mapping to the $\Omega $-Framework}{11}{subsection.8.2}%
-\contentsline {subsection}{\numberline {8.3}Six-Way Risk Decomposition}{11}{subsection.8.3}%
-\contentsline {section}{\numberline {9}Lean 4 Formalization}{11}{section.9}%
-\contentsline {section}{\numberline {10}Experimental Validation}{12}{section.10}%
-\contentsline {subsection}{\numberline {10.1}Experiment 1: EW-PG Variance Reduction}{12}{subsection.10.1}%
-\contentsline {subsection}{\numberline {10.2}Experiment 2: Blessing of Dimensionality}{13}{subsection.10.2}%
-\contentsline {subsection}{\numberline {10.3}Experiment 3: Coalition Formation}{13}{subsection.10.3}%
-\contentsline {subsection}{\numberline {10.4}Experiment 4: Full $\Omega $-PG}{13}{subsection.10.4}%
-\contentsline {subsection}{\numberline {10.5}Experiment 5: Sparsity Curriculum}{14}{subsection.10.5}%
-\contentsline {subsection}{\numberline {10.6}Experiment 6: FP-NE Discovery and Contraction Rates}{14}{subsection.10.6}%
-\contentsline {subsection}{\numberline {10.7}Experiment 7: Equilibrium Selection Quality}{15}{subsection.10.7}%
-\contentsline {subsection}{\numberline {10.8}Experiment 8: Bayesian Stopping and Cooperation from Selfishness}{16}{subsection.10.8}%
-\contentsline {subsection}{\numberline {10.9}Experiment 9: Iterated Prisoner's Dilemma — Adaptation (Kim et al.)}{16}{subsection.10.9}%
-\contentsline {subsection}{\numberline {10.10}Experiment 10: Iterated RPS — Competitive Exploitation}{17}{subsection.10.10}%
-\contentsline {subsection}{\numberline {10.11}Experiment 11: Strategy Identification}{17}{subsection.10.11}%
-\contentsline {subsection}{\numberline {10.12}Experiment 12: Scaling to N Players}{17}{subsection.10.12}%
-\contentsline {subsection}{\numberline {10.13}Summary of Experimental Findings}{18}{subsection.10.13}%
-\contentsline {section}{\numberline {11}Discussion}{19}{section.11}%
-\contentsline {subsection}{\numberline {11.1}The Evidence Weight as Unifying Concept}{19}{subsection.11.1}%
-\contentsline {subsection}{\numberline {11.2}LOLA and Cooperation as Dual G\"odelian Mechanisms}{19}{subsection.11.2}%
-\contentsline {subsection}{\numberline {11.3}The Vibing Scale: A Horseshoe, Not a Line}{20}{subsection.11.3}%
-\contentsline {subsection}{\numberline {11.4}Limitations and Future Work}{21}{subsection.11.4}%
-\contentsline {section}{\numberline {12}Conclusion}{21}{section.12}%
+\contentsline {section}{\numberline {1}Introduction}{4}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Contributions}{4}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}Relation to Prior Work}{5}{subsection.1.2}%
+\contentsline {section}{\numberline {2}Preliminaries}{5}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Stochastic Games}{5}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Policy Gradient and REINFORCE}{5}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}The SOS Condition (Giannou et al.)}{5}{subsection.2.3}%
+\contentsline {section}{\numberline {3}Evidence-Weighted Policy Gradient}{6}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Motivation: Heterogeneous Information}{6}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}The Keynesian Evidence Weight}{6}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Variance Improvement}{6}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Algorithm}{7}{subsection.3.4}%
+\contentsline {section}{\numberline {4}Opponent-Shaping Policy Gradient}{7}{section.4}%
+\contentsline {subsection}{\numberline {4.1}The LOLA Correction}{7}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Convergence Results}{7}{subsection.4.2}%
+\contentsline {section}{\numberline {5}Cooperative PG with Lossy Communication}{7}{section.5}%
+\contentsline {subsection}{\numberline {5.1}The Self-Knowledge Problem}{7}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Communication Loss Decomposition}{8}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Triple-Duty Evidence Weight}{8}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}Coalition Formation}{8}{subsection.5.4}%
+\contentsline {section}{\numberline {6}The Blessing of Dimensionality}{8}{section.6}%
+\contentsline {subsection}{\numberline {6.1}The Apparent Curse}{8}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}The Blessing: Sparse Recovery}{9}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}The Natural Curriculum}{9}{subsection.6.3}%
+\contentsline {section}{\numberline {7}Fixed-Point Nash Equilibrium Search}{9}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Nash Equilibria as Fixed Points}{9}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}Contraction and the Banach Fixed-Point Theorem}{10}{subsection.7.2}%
+\contentsline {subsection}{\numberline {7.3}Bayesian Exploration of the Fixed-Point Set}{10}{subsection.7.3}%
+\contentsline {subsection}{\numberline {7.4}Cooperation from Selfish Search}{10}{subsection.7.4}%
+\contentsline {subsection}{\numberline {7.5}The Topological Cooperation Theorem}{11}{subsection.7.5}%
+\contentsline {subsection}{\numberline {7.6}Integration: FP-NE as Phase~0 of $\Omega $-PG}{11}{subsection.7.6}%
+\contentsline {subsection}{\numberline {7.7}Relation to Meta-Value Learning and Meta-MAPG}{12}{subsection.7.7}%
+\contentsline {section}{\numberline {8}The Complete $\Omega $-Gradient}{12}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Unified Update Rule}{12}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Mapping to the $\Omega $-Framework}{13}{subsection.8.2}%
+\contentsline {subsection}{\numberline {8.3}Six-Way Risk Decomposition}{13}{subsection.8.3}%
+\contentsline {section}{\numberline {9}Lean 4 Formalization}{13}{section.9}%
+\contentsline {section}{\numberline {10}Experimental Validation}{14}{section.10}%
+\contentsline {subsection}{\numberline {10.1}Experiment 1: EW-PG Variance Reduction}{14}{subsection.10.1}%
+\contentsline {subsection}{\numberline {10.2}Experiment 2: Blessing of Dimensionality}{15}{subsection.10.2}%
+\contentsline {subsection}{\numberline {10.3}Experiment 3: Coalition Formation}{15}{subsection.10.3}%
+\contentsline {subsection}{\numberline {10.4}Experiment 4: Full $\Omega $-PG}{15}{subsection.10.4}%
+\contentsline {subsection}{\numberline {10.5}Experiment 5: Sparsity Curriculum}{16}{subsection.10.5}%
+\contentsline {subsection}{\numberline {10.6}Experiment 6: FP-NE Discovery and Contraction Rates}{16}{subsection.10.6}%
+\contentsline {subsection}{\numberline {10.7}Experiment 7: Equilibrium Selection Quality}{17}{subsection.10.7}%
+\contentsline {subsection}{\numberline {10.8}Experiment 8: Bayesian Stopping and Cooperation from Selfishness}{18}{subsection.10.8}%
+\contentsline {subsection}{\numberline {10.9}Experiment 9: Iterated Prisoner's Dilemma — Adaptation (Kim et al.)}{18}{subsection.10.9}%
+\contentsline {subsection}{\numberline {10.10}Experiment 10: Iterated RPS — Competitive Exploitation}{19}{subsection.10.10}%
+\contentsline {subsection}{\numberline {10.11}Experiment 11: Strategy Identification}{19}{subsection.10.11}%
+\contentsline {subsection}{\numberline {10.12}Experiment 12: Scaling to N Players}{19}{subsection.10.12}%
+\contentsline {subsection}{\numberline {10.13}Experiment 13: Topological Cooperation Theorem}{20}{subsection.10.13}%
+\contentsline {subsection}{\numberline {10.14}Experiment 14: AI Safety --- Corrigibility}{20}{subsection.10.14}%
+\contentsline {subsection}{\numberline {10.15}Experiment 15: AI Safety --- Deceptive Alignment}{20}{subsection.10.15}%
+\contentsline {subsection}{\numberline {10.16}Experiment 16: AI Safety --- Debate}{20}{subsection.10.16}%
+\contentsline {subsection}{\numberline {10.17}Experiment 17: Mesa-Optimisation Detection}{21}{subsection.10.17}%
+\contentsline {subsection}{\numberline {10.18}Experiment 18: Power-Seeking Dynamics}{22}{subsection.10.18}%
+\contentsline {subsection}{\numberline {10.19}Experiment 19: Multi-Principal AI Governance}{22}{subsection.10.19}%
+\contentsline {subsection}{\numberline {10.20}Experiment 20: The Alignment Tax}{23}{subsection.10.20}%
+\contentsline {subsection}{\numberline {10.21}Experiment 21: QRE Homotopy --- Bifurcation Tracking}{23}{subsection.10.21}%
+\contentsline {subsection}{\numberline {10.22}Experiment 22: Spectral Analysis of the BR Jacobian}{23}{subsection.10.22}%
+\contentsline {subsection}{\numberline {10.23}Experiment 23: Meta-Learning for IPD Cooperation}{24}{subsection.10.23}%
+\contentsline {subsection}{\numberline {10.24}Summary of Experimental Findings}{25}{subsection.10.24}%
+\contentsline {section}{\numberline {11}Discussion}{26}{section.11}%
+\contentsline {subsection}{\numberline {11.1}The Evidence Weight as Unifying Concept}{26}{subsection.11.1}%
+\contentsline {subsection}{\numberline {11.2}LOLA and Cooperation as Dual G\"odelian Mechanisms}{26}{subsection.11.2}%
+\contentsline {subsection}{\numberline {11.3}The Vibing Scale: A Horseshoe, Not a Line}{26}{subsection.11.3}%
+\contentsline {subsection}{\numberline {11.4}Computation as Cooperation Mechanism: Implications for AI Safety}{28}{subsection.11.4}%
+\contentsline {subsection}{\numberline {11.5}Limitations and Future Work}{28}{subsection.11.5}%
+\contentsline {section}{\numberline {12}Conclusion}{29}{section.12}%

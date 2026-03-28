@@ -1,10 +1,10 @@
 \contentsline {section}{\numberline {1}Setup}{1}{section.1}%
 \contentsline {section}{\numberline {2}Smoothed Best Response and Contraction}{2}{section.2}%
 \contentsline {section}{\numberline {3}Bayesian NE Discovery}{2}{section.3}%
-\contentsline {subsection}{\numberline {3.1}The Explore-Exploit Tradeoff}{2}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.1}The Explore-Exploit Tradeoff}{3}{subsection.3.1}%
 \contentsline {subsection}{\numberline {3.2}Good-Turing Estimator for Total NE Count}{3}{subsection.3.2}%
 \contentsline {subsection}{\numberline {3.3}Bayesian Stopping Rule}{3}{subsection.3.3}%
 \contentsline {section}{\numberline {4}Cooperation from Selfish Search}{3}{section.4}%
 \contentsline {section}{\numberline {5}Integration with the $\Omega $-Framework}{4}{section.5}%
-\contentsline {section}{\numberline {6}Connection to Kakutani and Brouwer}{4}{section.6}%
+\contentsline {section}{\numberline {6}Connection to Kakutani and Brouwer}{5}{section.6}%
 \contentsline {section}{\numberline {7}Experimental Predictions}{5}{section.7}%
