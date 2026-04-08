@@ -21,6 +21,7 @@ from generate_synthetic import generate
 from phase1_classifier import run_phase1
 from phase2_clustering import run_phase2
 from phase3_boundary import run_phase3
+from phase4_continuity import run_phase4
 from phase5_optimal_partition import run_phase5
 
 
@@ -37,6 +38,7 @@ def run_all(df: pd.DataFrame, args) -> dict:
     results["phase1"] = run_phase1(df, cv_folds=args.cv, n_permutations=args.permutations, seed=args.seed, fast=fast)
     results["phase2"] = run_phase2(df, n_random=args.random, seed=args.seed)
     results["phase3"] = run_phase3(df, n_random=args.random, cv=args.cv, seed=args.seed)
+    results["phase4"] = run_phase4(df, bandwidth=args.bandwidth, n_permutations=args.permutations, seed=args.seed)
     results["phase5"] = run_phase5(df, bandwidth=args.bandwidth, n_permutations=args.permutations, seed=args.seed)
 
     elapsed = perf_counter() - t0
@@ -55,6 +57,12 @@ def run_all(df: pd.DataFrame, args) -> dict:
     p3 = results["phase3"]
     print(f"Phase 3 accuracy (zodiac={p3['named_accuracies']['zodiac']:.4f}"
           f"  random_mean={p3['random_acc_mean']:.4f})  p={p3['p_zodiac_vs_random']:.4f}")
+    p4 = results["phase4"]
+    p4_summary = "  ".join(
+        f"k={k}: MAD={v['observed_mad']:.1f}d p={v['p_convergence']:.4f}"
+        for k, v in p4["scales"].items() if "error" not in v
+    )
+    print(f"Phase 4 smooth_p={p4['p_smooth']:.4f}  [{p4_summary}]")
     p5 = results["phase5"]
     print(f"Phase 5 MAD={p5['observed_mad']:.1f} days  p_convergence={p5['p_convergence']:.4f}"
           f"  (null median={p5['null_mad_median']:.1f})")
