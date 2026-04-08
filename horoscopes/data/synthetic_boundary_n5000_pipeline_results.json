@@ -1,0 +1,152 @@
+{
+  "phase1": {
+    "n": 5000,
+    "chance_baseline": 0.08333333333333333,
+    "classifiers": {
+      "LogisticRegression": {
+        "accuracy": 0.3704,
+        "ci_95": [
+          0.3571186340276712,
+          0.3838803616239898
+        ],
+        "lift": 4.444800000000001,
+        "f1_macro": 0.351734878043324,
+        "p_binom": 0.0
+      }
+    },
+    "best_classifier": "LogisticRegression",
+    "eta_squared": 0.27855770893010856,
+    "per_sign": {
+      "Capricorn": {
+        "n": 396,
+        "accuracy": 0.21717171717171718,
+        "lift": 2.6060606060606064
+      },
+      "Aquarius": {
+        "n": 426,
+        "accuracy": 0.23943661971830985,
+        "lift": 2.8732394366197185
+      },
+      "Pisces": {
+        "n": 428,
+        "accuracy": 0.49065420560747663,
+        "lift": 5.88785046728972
+      },
+      "Aries": {
+        "n": 395,
+        "accuracy": 0.07341772151898734,
+        "lift": 0.8810126582278481
+      },
+      "Taurus": {
+        "n": 429,
+        "accuracy": 0.585081585081585,
+        "lift": 7.020979020979021
+      },
+      "Gemini": {
+        "n": 451,
+        "accuracy": 0.6651884700665188,
+        "lift": 7.982261640798226
+      },
+      "Cancer": {
+        "n": 454,
+        "accuracy": 0.2775330396475771,
+        "lift": 3.3303964757709252
+      },
+      "Leo": {
+        "n": 394,
+        "accuracy": 0.2131979695431472,
+        "lift": 2.5583756345177666
+      },
+      "Virgo": {
+        "n": 372,
+        "accuracy": 0.34408602150537637,
+        "lift": 4.129032258064517
+      },
+      "Libra": {
+        "n": 450,
+        "accuracy": 0.30666666666666664,
+        "lift": 3.6799999999999997
+      },
+      "Scorpio": {
+        "n": 389,
+        "accuracy": 0.36503856041131105,
+        "lift": 4.380462724935733
+      },
+      "Sagittarius": {
+        "n": 416,
+        "accuracy": 0.6153846153846154,
+        "lift": 7.384615384615385
+      }
+    },
+    "permutation_p": 0.0,
+    "null_dist_mean": 0.087826,
+    "null_dist_std": 0.004438166738643331
+  },
+  "phase2": {
+    "n": 5000,
+    "n_random": 200,
+    "ari_zodiac_kmeans": 0.11731206564233815,
+    "nmi_zodiac_kmeans": 0.19338653567823452,
+    "ari_random_mean": -3.05401694585768e-05,
+    "ari_random_std": 0.0002750656775914583,
+    "nmi_random_mean": 0.00482957054794609,
+    "nmi_random_std": 0.0006169304011367145,
+    "p_ari": 0.0,
+    "p_nmi": 0.0,
+    "inertia_kmeans": 11106.261277076379,
+    "inertia_zodiac": 18086.639962204972,
+    "inertia_ratio": 1.6285084161972925
+  },
+  "phase3": {
+    "n": 5000,
+    "named_accuracies": {
+      "zodiac": 0.3746,
+      "calendar_months": 0.2904,
+      "school_year": 0.3256
+    },
+    "random_acc_mean": 0.403521,
+    "random_acc_std": 0.045539235380054416,
+    "random_acc_p5": 0.34379,
+    "random_acc_p95": 0.4966399999999999,
+    "p_zodiac_vs_random": 0.69,
+    "zodiac_percentile": 31.0
+  },
+  "phase5": {
+    "n": 5000,
+    "bandwidth": 7,
+    "k": 12,
+    "valid_days": 365,
+    "data_cuts_doy": [
+      21,
+      50,
+      82,
+      109,
+      141,
+      176,
+      233,
+      266,
+      297,
+      326,
+      354
+    ],
+    "zodiac_boundaries": [
+      20,
+      50,
+      80,
+      110,
+      141,
+      172,
+      204,
+      235,
+      266,
+      296,
+      326
+    ],
+    "observed_mad": 3.5454545454545454,
+    "null_mad_median": 8.863636363636363,
+    "null_mad_p5": 6.449999999999999,
+    "null_mad_p95": 11.831818181818182,
+    "p_convergence": 0.0,
+    "observed_percentile": 0.0
+  }
+}
