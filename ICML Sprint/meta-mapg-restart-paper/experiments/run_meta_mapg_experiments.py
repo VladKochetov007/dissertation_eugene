@@ -21,6 +21,10 @@ METHOD_LABELS = {
     "lola_style": "Peer only",
     "meta_mapg": "Meta-MAPG",
 }
+GAME_LABELS = {
+    "ipd": "IPD",
+    "stag_hunt": "Stag Hunt",
+}
 
 
 @dataclass(frozen=True)
@@ -366,9 +370,13 @@ def run_restart_selection(args: argparse.Namespace, outdir: Path) -> pd.DataFram
     rows: list[dict[str, float | int | str]] = []
     for method in ["standard_pg", "meta_mapg"]:
         for seed in range(args.selection_seeds):
+            # Paired design: for a fixed seed, PG and Meta-MAPG see the same
+            # restart initialisations and rollout RNG seeds.
             rng = np.random.default_rng(18000 + 53 * seed)
             best_welfare = -np.inf
             found_payoff_dominant = False
+            first_hit_budget = args.selection_budget + 1
+            cumulative_gap = 0.0
             for budget in range(1, args.selection_budget + 1):
                 init_theta = rng.uniform(low=-3.0, high=3.0, size=(2, game.n_states))
                 theta, _ = run_rollout(
@@ -392,6 +400,10 @@ def run_restart_selection(args: argparse.Namespace, outdir: Path) -> pd.DataFram
                     game,
                     threshold=args.success_threshold,
                 )
+                if found_payoff_dominant and first_hit_budget == args.selection_budget + 1:
+                    first_hit_budget = budget
+                welfare_gap = max(0.0, 8.0 - best_welfare)
+                cumulative_gap += welfare_gap
                 rows.append(
                     {
                         "experiment": "restart_selection",
@@ -400,7 +412,10 @@ def run_restart_selection(args: argparse.Namespace, outdir: Path) -> pd.DataFram
                         "seed": seed,
                         "budget": budget,
                         "best_welfare": float(best_welfare),
+                        "welfare_gap": float(welfare_gap),
+                        "cumulative_welfare_gap": float(cumulative_gap),
                         "payoff_dominant_found": int(found_payoff_dominant),
+                        "first_hit_budget": int(first_hit_budget),
                     }
                 )
     df = pd.DataFrame(rows)
@@ -541,7 +556,13 @@ def save_summary_table(ablation: pd.DataFrame, restart: pd.DataFrame, outdir: Pa
     with (outdir / "main_results_table.tex").open("w", newline="") as handle:
         handle.write("\\begin{tabular}{llccc}\\toprule\n")
         handle.write("Game & Method & Ablation success & Restart success & Restarts \\\\\\midrule\n")
-        for _, row in summary.iterrows():
+        ordered_rows = []
+        for game_name in ["stag_hunt", "ipd"]:
+            for method_name in METHODS:
+                match = summary[(summary["game"] == game_name) & (summary["method"] == method_name)]
+                if not match.empty:
+                    ordered_rows.append(match.iloc[0])
+        for row in ordered_rows:
             game = row["game"].replace("_", " ")
             method = METHOD_LABELS[row["method"]]
             restart_row = restart_summary[
@@ -569,7 +590,7 @@ def plot_ablation(ablation: pd.DataFrame, outdir: Path) -> None:
         ax.set_xticks(range(len(METHODS)))
         ax.set_xticklabels([METHOD_LABELS[m] for m in METHODS], rotation=25, ha="right")
         ax.set_ylim(0.0, 1.0)
-        ax.set_title(game_name.replace("_", " ").title())
+        ax.set_title(GAME_LABELS.get(game_name, game_name.replace("_", " ").title()))
         ax.grid(axis="y", alpha=0.25)
     axes[0].set_ylabel("Cooperative convergence rate")
     fig.tight_layout()
@@ -587,7 +608,7 @@ def plot_restart(restart: pd.DataFrame, outdir: Path) -> None:
         ax.bar(range(2), grouped.values, yerr=err.values, capsize=4, color=colors)
         ax.set_xticks(range(2))
         ax.set_xticklabels(["PG", "Meta-MAPG"])
-        ax.set_title(game_name.replace("_", " ").title())
+        ax.set_title(GAME_LABELS.get(game_name, game_name.replace("_", " ").title()))
         ax.grid(axis="y", alpha=0.25)
     axes[0].set_ylabel("Restarts until success")
     fig.tight_layout()
@@ -604,38 +625,42 @@ def plot_restart_selection(selection: pd.DataFrame, outdir: Path) -> None:
         grouped = (
             sub.groupby("budget")
             .agg(
-                mean_welfare=("best_welfare", "mean"),
-                sem_welfare=("best_welfare", lambda x: float(np.std(x, ddof=1) / np.sqrt(len(x)))),
                 success=("payoff_dominant_found", "mean"),
+                sem_success=("payoff_dominant_found", lambda x: float(np.std(x, ddof=1) / np.sqrt(len(x)))),
+                area_gap=("cumulative_welfare_gap", "mean"),
             )
             .reset_index()
         )
         x = grouped["budget"].to_numpy(dtype=float)
-        y = grouped["mean_welfare"].to_numpy(dtype=float)
-        sem = grouped["sem_welfare"].to_numpy(dtype=float)
+        y = grouped["success"].to_numpy(dtype=float)
+        sem = grouped["sem_success"].to_numpy(dtype=float)
         ax.plot(x, y, marker="o", linewidth=2.0, color=colors[method], label=METHOD_LABELS[method])
-        ax.fill_between(x, y - 1.96 * sem, y + 1.96 * sem, color=colors[method], alpha=0.18, linewidth=0)
+        ax.fill_between(
+            x,
+            np.clip(y - 1.96 * sem, 0.0, 1.0),
+            np.clip(y + 1.96 * sem, 0.0, 1.0),
+            color=colors[method],
+            alpha=0.18,
+            linewidth=0,
+        )
 
-    ax.axhline(8.0, color="#2f4b26", linestyle="--", linewidth=1.2, label="Payoff-dominant NE")
-    ax.axhline(4.0, color="#6b6b6b", linestyle=":", linewidth=1.2, label="Risk-dominant NE")
     ax.set_xlabel("Restart budget K")
-    ax.set_ylabel("Best discovered social welfare")
+    ax.set_ylabel("P(first hit by K)")
     ax.set_xlim(1, float(selection["budget"].max()))
-    ax.set_ylim(3.7, 8.25)
+    ax.set_ylim(0.0, 1.02)
     ax.grid(alpha=0.25)
 
-    inset = ax.inset_axes([0.55, 0.17, 0.4, 0.34])
+    inset = ax.inset_axes([0.54, 0.17, 0.41, 0.34])
     for method in ["standard_pg", "meta_mapg"]:
         sub = selection[selection["method"] == method]
-        success = sub.groupby("budget")["payoff_dominant_found"].mean().reset_index()
+        area = sub.groupby("budget")["cumulative_welfare_gap"].mean().reset_index()
         inset.plot(
-            success["budget"],
-            success["payoff_dominant_found"],
+            area["budget"],
+            area["cumulative_welfare_gap"],
             color=colors[method],
             linewidth=1.5,
         )
-    inset.set_ylim(0.0, 1.02)
-    inset.set_title("P(payoff-dominant)", fontsize=7)
+    inset.set_title("Area gap (lower better)", fontsize=7)
     inset.tick_params(labelsize=7)
     inset.grid(alpha=0.2)
 
@@ -738,12 +763,12 @@ def write_manifest(args: argparse.Namespace, outdir: Path) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run sample-based Meta-MAPG restart experiments.")
     parser.add_argument("--outdir", type=Path, default=Path("artifacts/main"))
-    parser.add_argument("--seeds", type=int, default=20)
+    parser.add_argument("--seeds", type=int, default=100)
     parser.add_argument("--steps", type=int, default=260)
     parser.add_argument("--restart-steps", type=int, default=120)
     parser.add_argument("--max-restarts", type=int, default=12)
     parser.add_argument("--selection-budget", type=int, default=12)
-    parser.add_argument("--selection-seeds", type=int, default=50)
+    parser.add_argument("--selection-seeds", type=int, default=100)
     parser.add_argument("--selection-steps", type=int, default=120)
     parser.add_argument("--trajectory-steps", type=int, default=140)
     parser.add_argument("--trajectory-batch-size", type=int, default=384)
@@ -756,10 +781,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lr", type=float, default=0.9)
     parser.add_argument("--lr-power", type=float, default=0.24)
     parser.add_argument("--inner-lr", type=float, default=0.55)
-    parser.add_argument("--peer-coef", type=float, default=1.2)
-    parser.add_argument("--basin-peer-coef", type=float, default=1.75)
-    parser.add_argument("--selection-peer-coef", type=float, default=2.0)
-    parser.add_argument("--trajectory-peer-coef", type=float, default=2.0)
+    parser.add_argument("--peer-coef", type=float, default=1.5)
+    parser.add_argument("--basin-peer-coef", type=float, default=None)
+    parser.add_argument("--selection-peer-coef", type=float, default=None)
+    parser.add_argument("--trajectory-peer-coef", type=float, default=None)
     parser.add_argument("--own-coef", type=float, default=0.35)
     parser.add_argument("--lambda-power", type=float, default=0.0)
     parser.add_argument("--success-threshold", type=float, default=0.82)
@@ -775,6 +800,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if args.basin_peer_coef is None:
+        args.basin_peer_coef = args.peer_coef
+    if args.selection_peer_coef is None:
+        args.selection_peer_coef = args.peer_coef
+    if args.trajectory_peer_coef is None:
+        args.trajectory_peer_coef = args.peer_coef
     outdir = args.outdir
     outdir.mkdir(parents=True, exist_ok=True)
     write_manifest(args, outdir)

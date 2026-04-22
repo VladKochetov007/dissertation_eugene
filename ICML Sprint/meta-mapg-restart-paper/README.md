@@ -1,6 +1,6 @@
 # Meta-MAPG Restart Paper
 
-This folder contains a fresh ICML-style workshop draft for the Meta-MAPG convergence and restart-globalisation thesis.
+This folder contains a fresh ICML-style workshop draft for the Meta-MAPG two-phase convergence and restart-globalisation thesis.
 
 Canonical files:
 
@@ -8,7 +8,7 @@ Canonical files:
 - `main.pdf`: compiled PDF.
 - `references.bib`: bibliography.
 - `experiments/run_meta_mapg_experiments.py`: sample-based tabular experiments.
-- `artifacts/main/`: 20-seed experiment outputs used in the paper.
+- `artifacts/main/`: experiment outputs used in the paper.
 - `figures/` and `tables/`: paper-ready copies of the generated figures and summary table.
 
 Regenerate the experiments from this directory with:
@@ -16,27 +16,24 @@ Regenerate the experiments from this directory with:
 ```bash
 python3 experiments/run_meta_mapg_experiments.py \
   --outdir artifacts/main \
-  --seeds 20 \
+  --seeds 100 \
   --steps 260 \
   --restart-steps 120 \
   --max-restarts 12 \
   --selection-budget 12 \
-  --selection-seeds 50 \
+  --selection-seeds 100 \
   --selection-steps 120 \
   --trajectory-steps 140 \
   --trajectory-batch-size 384 \
   --trajectory-grid-size 5 \
-  --batch-size 256 \
-  --basin-batch-size 128 \
+  --batch-size 384 \
+  --basin-batch-size 192 \
   --grid-size 21 \
-  --basin-steps 120 \
+  --basin-steps 140 \
   --reference-batch-size 120000 \
   --sanity-reps 80 \
-  --own-coef 0.05 \
-  --peer-coef 1.5 \
-  --basin-peer-coef 2.0 \
-  --selection-peer-coef 2.0 \
-  --trajectory-peer-coef 2.0
+  --own-coef 0.35 \
+  --peer-coef 1.5
 ```
 
 Recompile the paper with:
