@@ -309,7 +309,7 @@ The implemented one-step correction is $\eta\widehat H_{ii}^\top\hat g_i$ for ow
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{figures/basin_trajectories.pdf}
+  \includegraphics[width=\linewidth]{figures/basin_trajectories}
   \caption{Basin geometry and dynamics in Stag Hunt. Background shading is the empirical basin map on a $21\times21$ grid of initial cooperation probabilities (lavender = converges to the payoff-dominant equilibrium, cream = converges to the risk-dominant equilibrium). The dashed contour is the $0.5$-success level set of the smoothed basin indicator, i.e.\ the empirical separatrix. Overlaid trajectories show joint cooperation evolution from a $5\times5$ sub-grid of initialisations; green curves land above the frontier, red curves fall below. Under Meta-MAPG the frontier is pushed left and down: the certified basin grows from $27.0\%$ of the grid under PG to $42.6\%$, consistent with \cref{prop:basin}. This is not a convergence proof; it is the geometric bridge between the stochastic-approximation theorem and the restart-efficiency gains.}
   \label{fig:basin-traj}
 \end{figure}
@@ -323,14 +323,14 @@ The implemented one-step correction is $\eta\widehat H_{ii}^\top\hat g_i$ for ow
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{figures/peer_sweep.pdf}
+  \includegraphics[width=\linewidth]{figures/peer_sweep}
   \caption{Peer-shaping sweep on Stag Hunt. Left: fraction of $11\times 11$ initial-policy grid points that converge to the payoff-dominant basin, as a function of the peer-shaping coefficient $\lambda$. The rate grows monotonically from the PG baseline ($\lambda=0$, $29.8\%$) to $62.8\%$ at $\lambda=5$, approximately linearly for small $\lambda$ as predicted by the certified-radius scaling $\rho_\lambda\gtrsim\rho_0+\lambda\mu_M/(2L)$ of \cref{prop:basin}. Right: mean first-hit step, conditional on eventual success, as a function of $\lambda$; basin-entry horizon contracts from $\approx 25$ steps to $\approx 20$ steps, consistent with \cref{cor:speedup}.}
   \label{fig:peer-sweep}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{figures/annealing_ablation.pdf}
+  \includegraphics[width=\linewidth]{figures/annealing_ablation}
   \caption{Two-phase schedule vs constant shaping in Stag Hunt ($80$ seeds, $260$ steps, $\lambda_c=1.5$). Left: cooperative success rate. PG reaches $31\%$, constant-shaping Meta-MAPG reaches $41\%$, and the two-phase schedule of \cref{thm:two-phase} reaches $43\%$, showing that annealing to recover Nash consistency does not degrade empirical basin entry. Right: shaping schedule $\lambda_n$ versus step; the dotted vertical line is the phase-1/phase-2 boundary $N_0=100$. This is the only experiment that runs a genuinely annealed schedule rather than constant $\lambda$.}
   \label{fig:annealing}
 \end{figure}
