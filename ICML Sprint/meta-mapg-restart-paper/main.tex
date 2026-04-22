@@ -202,7 +202,17 @@ Fifth, restarts globalise this local guarantee in the usual product-space way. E
 
 \section{Experiments}\label{sec:experiments}
 
-The experiments are intentionally small and theorem-facing. We use tabular Bernoulli policies in Stag Hunt and finite-horizon iterated Prisoner's Dilemma (IPD). Updates are sample-based: for a trajectory score $s_i=\nabla_{\phi_i}\log p_\phi(\tau)$ and return $R_i$, the base estimator is $\hat g_i=\frac{1}{B}\sum_b R_i^{(b)}s_i^{(b)}$. The own-learning term uses the likelihood-ratio Hessian estimator
+The experiments are intentionally small and theorem-facing. We use tabular Bernoulli policies in Stag Hunt and finite-horizon iterated Prisoner's Dilemma (IPD). For clarity, our Stag Hunt is a one-state, one-step, two-agent Markov game: each agent samples $C$ or $D$ from a Bernoulli policy, with row-player payoff matrix
+\[
+\begin{array}{c|cc}
+ & C & D\\ \hline
+C & 4 & 0\\
+D & 3 & 2
+\end{array}
+\]
+and the column-player payoff given by the transpose. Thus $(C,C)$ is the payoff-dominant Nash equilibrium with social welfare $8$, while $(D,D)$ is the risk-dominant Nash equilibrium with social welfare $4$. In the Stag Hunt figures, each coordinate is simply an agent's cooperation probability $p_i=\pi_i(C)$, and cooperative success means both final cooperation probabilities exceed $0.82$.
+
+Updates are sample-based: for a trajectory score $s_i=\nabla_{\phi_i}\log p_\phi(\tau)$ and return $R_i$, the base estimator is $\hat g_i=\frac{1}{B}\sum_b R_i^{(b)}s_i^{(b)}$. The own-learning term uses the likelihood-ratio Hessian estimator
 \[
 \widehat H_{ii}=\frac{1}{B}\sum_b R_i^{(b)}\left(s_i^{(b)}s_i^{(b)\top}+\nabla_{\phi_i}^2\log p_\phi(\tau^{(b)})\right),
 \]
