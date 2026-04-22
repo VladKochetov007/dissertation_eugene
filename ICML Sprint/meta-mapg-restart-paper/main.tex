@@ -236,7 +236,7 @@ If the phase-1 estimator has conditional variance at most $\sigma^2$ and bias no
 &\quad\le
 \frac{4}{\rho^2}\left(
 V_0e^{-\mu_{\lambda_c}\alpha_0 N_0}
-+C\alpha_0(\beta_0^2+\alpha_0\sigma^2)
+{}+C\alpha_0(\beta_0^2+\alpha_0\sigma^2)
 \right),
 \end{aligned}
 \]
@@ -505,14 +505,21 @@ Using $(1-x)^k\le e^{-xk}$ for $x\in[0,1]$,
 \paragraph{Step 3: Markov's inequality.}
 If $\phi_{N_0}\notin\B_{\rho/2}$ and $\tau>N_0$, then $V_{N_0}\ge (\rho/2)^2$. If $\tau\le N_0$, by continuity of trajectories (or by projection onto $\K$) the iterate at time $\tau$ already lies outside $\B_\rho$, and in particular $V_\tau\ge \rho^2\ge (\rho/2)^2$; $\tilde V_{N_0}=V_\tau$ in that case. Hence in both cases $\tilde V_{N_0}\ge (\rho/2)^2$. Therefore
 \[
+\begin{aligned}
 \Pr(\phi_{N_0}\notin\B_{\rho/2}\mid \phi_0\in\B_\rho)
-\le \Pr(\tilde V_{N_0}\ge (\rho/2)^2)
-\le \frac{4\E[\tilde V_{N_0}]}{\rho^2}.
+&\le \Pr(\tilde V_{N_0}\ge (\rho/2)^2) \\
+&\le \frac{4\E[\tilde V_{N_0}]}{\rho^2}.
+\end{aligned}
 \]
 Combining with Step 2,
 \[
+\begin{aligned}
 \Pr(\phi_{N_0}\notin\B_{\rho/2}\mid\phi_0\in\B_\rho)
-\le \frac{4}{\rho^2}\!\left(V_0 e^{-\mu_{\lambda_c}\alpha_0 N_0}+C\alpha_0(\beta_0^2+\alpha_0\sigma^2)\right),
+&\le \frac{4V_0}{\rho^2}\,
+\exp\!\left(-\mu_{\lambda_c}\alpha_0 N_0\right) \\
+&\quad + \frac{4C\alpha_0}{\rho^2}\,
+\left(\beta_0^2+\alpha_0\sigma^2\right).
+\end{aligned}
 \]
 for a constant $C$ depending on $\mu_{\lambda_c}$, $C_{F_{\lambda_c}}$.
 
@@ -544,8 +551,14 @@ Conditional on $\phi_0^{(k)}\in\B_\rho$, \cref{thm:two-phase} gives $\Pr(\text{e
 \paragraph{Step 2: geometric tail.}
 Let $T:=\inf\{k\ge 1:A_k\text{ occurs}\}$. Then
 \[
-\Pr(T>k)=\E\!\left[\prod_{j=1}^k\mathbf{1}_{A_j^c}\right]
-=\E\!\left[\E[\mathbf{1}_{A_k^c}\mid\F_k^{\mathrm{epoch}}]\prod_{j=1}^{k-1}\mathbf{1}_{A_j^c}\right].
+\begin{aligned}
+\Pr(T>k)
+&=\E\!\left[\prod_{j=1}^k\mathbf{1}_{A_j^c}\right] \\
+&=\E\!\left[
+\E[\mathbf{1}_{A_k^c}\mid\F_k^{\mathrm{epoch}}]
+\prod_{j=1}^{k-1}\mathbf{1}_{A_j^c}
+\right].
+\end{aligned}
 \]
 By Step 1, $\E[\mathbf{1}_{A_k^c}\mid\F_k^{\mathrm{epoch}}]\le 1-p_\star$ almost surely, so iterating,
 \[
