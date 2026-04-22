@@ -17,6 +17,10 @@ restart_steps,120
 sanity_batches,"[48, 96, 192, 384, 768]"
 sanity_reps,80
 seeds,20
+selection_budget,12
+selection_peer_coef,2.0
+selection_seeds,50
+selection_steps,120
 skip_basin,False
 skip_sanity,False
 steps,260

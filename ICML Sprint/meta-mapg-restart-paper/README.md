@@ -20,6 +20,9 @@ python3 experiments/run_meta_mapg_experiments.py \
   --steps 260 \
   --restart-steps 120 \
   --max-restarts 12 \
+  --selection-budget 12 \
+  --selection-seeds 50 \
+  --selection-steps 120 \
   --batch-size 256 \
   --basin-batch-size 128 \
   --grid-size 21 \
@@ -28,7 +31,8 @@ python3 experiments/run_meta_mapg_experiments.py \
   --sanity-reps 80 \
   --own-coef 0.05 \
   --peer-coef 1.5 \
-  --basin-peer-coef 2.0
+  --basin-peer-coef 2.0 \
+  --selection-peer-coef 2.0
 ```
 
 Recompile the paper with:

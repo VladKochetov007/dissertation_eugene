@@ -55,7 +55,7 @@
 \printAffiliationsAndNotice{}
 
 \begin{abstract}
-Policy-gradient methods in general stochastic games admit local convergence guarantees near stable Nash policies, but these guarantees are usually stated for independent policy-gradient fields that do not anticipate opponent learning. Opponent-aware methods such as LOLA and Meta-MAPG add terms that differentiate through the future learning of other agents, and empirically alter both adaptation and equilibrium selection. This paper gives a stochastic-approximation account of this mechanism. We show that finite-unroll Meta-MAPG estimators decompose into a Nash-consistent mean field, a martingale-difference noise term, and a summable truncation/modeling bias. Consequently, Giannou et al.'s local convergence theorem applies to annealed Meta-MAPG near strategically stable Nash equilibria. We then add a restart mechanism: if reinitialisations have positive probability of landing in the local basin, the number of failed epochs is geometrically bounded and the restarted process converges almost surely after finitely many restarts. Small tabular experiments support the proof obligations: peer-learning terms change equilibrium selection, restarts are more efficient under Meta-MAPG than under PG, basin maps expand under opponent-aware shaping, and estimator variance decreases with batch size.
+Policy-gradient methods in general stochastic games admit local convergence guarantees near stable Nash policies, but these guarantees are usually stated for independent policy-gradient fields that do not anticipate opponent learning. Opponent-aware methods such as LOLA and Meta-MAPG add terms that differentiate through the future learning of other agents, and empirically alter both adaptation and equilibrium selection. This paper gives a stochastic-approximation account of this mechanism. We show that finite-unroll Meta-MAPG estimators decompose into a Nash-consistent mean field, a martingale-difference noise term, and a summable truncation/modeling bias. Consequently, Giannou et al.'s local convergence theorem applies to annealed Meta-MAPG near strategically stable Nash equilibria. We then add a restart mechanism: if reinitialisations have positive probability of landing in the local basin, the number of failed epochs is geometrically bounded and the restarted process converges almost surely after finitely many restarts. Small tabular experiments support the proof obligations: peer-learning terms change equilibrium selection, restart budget acts as an equilibrium-selection mechanism, basin maps expand under opponent-aware shaping, and estimator variance decreases with batch size.
 \end{abstract}
 
 \section{Introduction}
@@ -66,7 +66,7 @@ Opponent-aware policy gradients address this missing dependence. LOLA differenti
 
 We show that this gap can be closed locally. Our first contribution is an estimator decomposition: under bounded rewards, smooth policies, controlled unroll length, and standard sampling assumptions, the Meta-MAPG update is a stochastic approximation to a Nash-consistent opponent-aware vector field. The own- and peer-learning terms enter as either part of the mean field or as a summable annealed perturbation, while sampling error remains a martingale difference with bounded conditional second moment.
 
-Our second contribution is a restart globalisation of the local theorem. Local convergence cannot become unconditional without information about the basin of attraction; even normal-form games can contain cycles and multiple attractors. However, if restarts draw from a full-support distribution on a compact policy-parameter set, every epoch has a fixed positive probability of starting in the local basin. This gives an almost-sure finite-restart guarantee and an explicit expected restart bound. Experiments in Stag Hunt and iterated Prisoner's Dilemma then test the precise claims the theorem uses: component ablations, restart efficiency, basin volume, and estimator variance.
+Our second contribution is a restart globalisation of the local theorem. Local convergence cannot become unconditional without information about the basin of attraction; even normal-form games can contain cycles and multiple attractors. However, if restarts draw from a full-support distribution on a compact policy-parameter set, every epoch has a fixed positive probability of starting in the local basin. This gives an almost-sure finite-restart guarantee and an explicit expected restart bound. In this view, restart budget is not merely a rescue heuristic; it is an equilibrium-selection resource whose effectiveness depends on basin mass. Experiments in Stag Hunt and iterated Prisoner's Dilemma then test the precise claims the theorem uses: component ablations, restart-budget selection, basin volume, and estimator variance.
 
 \section{Setup}\label{sec:setup}
 
@@ -221,8 +221,8 @@ The implemented one-step correction is $\eta\widehat H_{ii}^\top\hat g_i$ for ow
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{figures/restart_efficiency.pdf}
-  \caption{Restart efficiency. With the same restart budget and threshold, Meta-MAPG requires fewer restarts than PG. In IPD, Meta-MAPG succeeds in $85\%$ of runs with mean $5.30$ restarts, while PG succeeds in $30\%$ with mean $10.70$ restarts. In Stag Hunt, both succeed in all runs, but Meta-MAPG reduces mean restarts from $1.65$ to $1.00$.}
+  \includegraphics[width=\linewidth]{figures/restart_selection.pdf}
+  \caption{Restart budget as an equilibrium-selection mechanism in Stag Hunt. For each budget $K$, we report the best social welfare discovered across $K$ independent restart attempts, averaged over 50 random seeds; bands show 95\% confidence intervals. Dashed lines mark the payoff-dominant Nash equilibrium (welfare $8$) and the risk-dominant Nash equilibrium (welfare $4$). As $K$ increases, restart search increasingly selects the payoff-dominant equilibrium; the effect is stronger under Meta-MAPG, consistent with opponent-aware shaping increasing entry into the cooperative basin. The inset shows payoff-dominant discovery probability.}
   \label{fig:restart}
 \end{figure}
 
@@ -247,11 +247,11 @@ The implemented one-step correction is $\eta\widehat H_{ii}^\top\hat g_i$ for ow
   \resizebox{\linewidth}{!}{\input{tables/main_results_table.tex}}
 \end{table}
 
-The empirical claims are modest. The ablation primarily shows that peer-learning terms matter; it does not prove full Meta-MAPG dominates every LOLA-style variant in every game. The restart and basin experiments are the direct support for \cref{thm:restart,prop:basin}: opponent-aware shaping increases the measured basin in Stag Hunt and reduces the observed restart count under the same reinitialisation procedure. The estimator sanity check supports \cref{lem:decomp} by verifying that the implemented sample estimator has controlled variance as batch size increases.
+The empirical claims are modest. The ablation primarily shows that peer-learning terms matter; it does not prove full Meta-MAPG dominates every LOLA-style variant in every game. The restart-budget and basin experiments are the direct support for \cref{thm:restart,prop:basin}: restarts turn local convergence into equilibrium search, and opponent-aware shaping improves that search by increasing the measured cooperative basin in Stag Hunt. The older restart-count statistic is retained in \cref{tab:results}. The estimator sanity check supports \cref{lem:decomp} by verifying that the implemented sample estimator has controlled variance as batch size increases.
 
 \section{Discussion}
 
-The result is local before it is global. Meta-MAPG inherits Giannou et al.'s stable-Nash theory only inside attracting neighbourhoods and only after the estimator has been placed in the stochastic-approximation form. Restarts remove dependence on a particular initialisation, but they do not identify the best equilibrium without an additional selection rule. Their expected complexity depends on the basin probability $p_\B$; opponent-aware shaping helps only when it increases this probability.
+The result is local before it is global. Meta-MAPG inherits Giannou et al.'s stable-Nash theory only inside attracting neighbourhoods and only after the estimator has been placed in the stochastic-approximation form. Restarts remove dependence on a particular initialisation and can be used to search across equilibrium basins; selecting the best discovered endpoint then turns restart budget into a simple equilibrium-selection mechanism. Its expected complexity depends on the basin probability $p_\B$; opponent-aware shaping helps only when it increases this probability.
 
 The assumptions are also substantive. The Meta-MAPG estimator must have bounded conditional variance, truncation schedules must make unroll bias summable, and asymptotic shaping must be Nash-consistent. Constant shaping is useful for basin geometry and finite-time behaviour, but a constant peer term can move the limiting fixed points in general-sum games. This is why the theorem separates annealed convergence from constant-shaping basin diagnostics.
 
@@ -306,6 +306,9 @@ python3 experiments/run_meta_mapg_experiments.py
   --steps 260 \
   --restart-steps 120 \
   --max-restarts 12 \
+  --selection-budget 12 \
+  --selection-seeds 50 \
+  --selection-steps 120 \
   --batch-size 256 \
   --basin-batch-size 128 \
   --grid-size 21 \
@@ -314,10 +317,11 @@ python3 experiments/run_meta_mapg_experiments.py
   --sanity-reps 80 \
   --own-coef 0.05 \
   --peer-coef 1.5 \
-  --basin-peer-coef 2.0
+  --basin-peer-coef 2.0 \
+  --selection-peer-coef 2.0
 \end{verbatim}
 }
-The raw files are \texttt{ablation\_summary.csv}, \texttt{restart\_summary.csv}, \texttt{basin\_map.csv}, and \texttt{estimator\_sanity.csv} under \texttt{artifacts/main}. The code uses no exact gradients for updates; expected returns are computed only for logging and evaluation.
+The raw files are \texttt{ablation\_summary.csv}, \texttt{restart\_summary.csv}, \texttt{restart\_selection.csv}, \texttt{basin\_map.csv}, and \texttt{estimator\_sanity.csv} under \texttt{artifacts/main}. The code uses no exact gradients for updates; expected returns are computed only for logging and evaluation.
 
 \bibliography{references}
 \bibliographystyle{icml2026}

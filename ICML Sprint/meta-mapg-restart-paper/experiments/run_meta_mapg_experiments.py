@@ -361,6 +361,53 @@ def run_restart(args: argparse.Namespace, outdir: Path) -> pd.DataFrame:
     return df
 
 
+def run_restart_selection(args: argparse.Namespace, outdir: Path) -> pd.DataFrame:
+    game = stag_hunt()
+    rows: list[dict[str, float | int | str]] = []
+    for method in ["standard_pg", "meta_mapg"]:
+        for seed in range(args.selection_seeds):
+            rng = np.random.default_rng(18000 + 53 * seed)
+            best_welfare = -np.inf
+            found_payoff_dominant = False
+            for budget in range(1, args.selection_budget + 1):
+                init_theta = rng.uniform(low=-3.0, high=3.0, size=(2, game.n_states))
+                theta, _ = run_rollout(
+                    game=game,
+                    method=method,
+                    seed=int(rng.integers(0, 2**31 - 1)),
+                    steps=args.selection_steps,
+                    batch_size=args.batch_size,
+                    lr=args.lr,
+                    inner_lr=args.inner_lr,
+                    peer_coef=args.selection_peer_coef,
+                    own_coef=args.own_coef,
+                    init_theta=init_theta,
+                    lr_power=args.lr_power,
+                    lambda_power=0.0,
+                )
+                welfare = float(np.sum(expected_return(theta, game)))
+                best_welfare = max(best_welfare, welfare)
+                found_payoff_dominant = found_payoff_dominant or is_success(
+                    theta,
+                    game,
+                    threshold=args.success_threshold,
+                )
+                rows.append(
+                    {
+                        "experiment": "restart_selection",
+                        "game": game.name,
+                        "method": method,
+                        "seed": seed,
+                        "budget": budget,
+                        "best_welfare": float(best_welfare),
+                        "payoff_dominant_found": int(found_payoff_dominant),
+                    }
+                )
+    df = pd.DataFrame(rows)
+    df.to_csv(outdir / "restart_selection.csv", index=False)
+    return df
+
+
 def run_basin(args: argparse.Namespace, outdir: Path) -> pd.DataFrame:
     game = stag_hunt()
     rows: list[dict[str, float | int | str]] = []
@@ -501,6 +548,56 @@ def plot_restart(restart: pd.DataFrame, outdir: Path) -> None:
     plt.close(fig)
 
 
+def plot_restart_selection(selection: pd.DataFrame, outdir: Path) -> None:
+    fig, ax = plt.subplots(figsize=(5.2, 3.25))
+    colors = {"standard_pg": "#4c78a8", "meta_mapg": "#b279a2"}
+    for method in ["standard_pg", "meta_mapg"]:
+        sub = selection[selection["method"] == method]
+        grouped = (
+            sub.groupby("budget")
+            .agg(
+                mean_welfare=("best_welfare", "mean"),
+                sem_welfare=("best_welfare", lambda x: float(np.std(x, ddof=1) / np.sqrt(len(x)))),
+                success=("payoff_dominant_found", "mean"),
+            )
+            .reset_index()
+        )
+        x = grouped["budget"].to_numpy(dtype=float)
+        y = grouped["mean_welfare"].to_numpy(dtype=float)
+        sem = grouped["sem_welfare"].to_numpy(dtype=float)
+        ax.plot(x, y, marker="o", linewidth=2.0, color=colors[method], label=METHOD_LABELS[method])
+        ax.fill_between(x, y - 1.96 * sem, y + 1.96 * sem, color=colors[method], alpha=0.18, linewidth=0)
+
+    ax.axhline(8.0, color="#2f4b26", linestyle="--", linewidth=1.2, label="Payoff-dominant NE")
+    ax.axhline(4.0, color="#6b6b6b", linestyle=":", linewidth=1.2, label="Risk-dominant NE")
+    ax.set_xlabel("Restart budget K")
+    ax.set_ylabel("Best discovered social welfare")
+    ax.set_xlim(1, float(selection["budget"].max()))
+    ax.set_ylim(3.7, 8.25)
+    ax.grid(alpha=0.25)
+
+    inset = ax.inset_axes([0.55, 0.17, 0.4, 0.34])
+    for method in ["standard_pg", "meta_mapg"]:
+        sub = selection[selection["method"] == method]
+        success = sub.groupby("budget")["payoff_dominant_found"].mean().reset_index()
+        inset.plot(
+            success["budget"],
+            success["payoff_dominant_found"],
+            color=colors[method],
+            linewidth=1.5,
+        )
+    inset.set_ylim(0.0, 1.02)
+    inset.set_title("P(payoff-dominant)", fontsize=7)
+    inset.tick_params(labelsize=7)
+    inset.grid(alpha=0.2)
+
+    ax.legend(loc="lower left", fontsize=7, frameon=True)
+    fig.tight_layout()
+    fig.savefig(outdir / "restart_selection.pdf")
+    fig.savefig(outdir / "restart_selection.png", dpi=180)
+    plt.close(fig)
+
+
 def plot_basin(basin: pd.DataFrame, outdir: Path) -> None:
     methods = ["standard_pg", "meta_mapg"]
     fig, axes = plt.subplots(1, 2, figsize=(7.4, 3.2), sharex=True, sharey=True)
@@ -560,6 +657,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--steps", type=int, default=260)
     parser.add_argument("--restart-steps", type=int, default=120)
     parser.add_argument("--max-restarts", type=int, default=12)
+    parser.add_argument("--selection-budget", type=int, default=12)
+    parser.add_argument("--selection-seeds", type=int, default=50)
+    parser.add_argument("--selection-steps", type=int, default=120)
     parser.add_argument("--batch-size", type=int, default=384)
     parser.add_argument("--basin-batch-size", type=int, default=192)
     parser.add_argument("--lr", type=float, default=0.9)
@@ -567,6 +667,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--inner-lr", type=float, default=0.55)
     parser.add_argument("--peer-coef", type=float, default=1.2)
     parser.add_argument("--basin-peer-coef", type=float, default=1.75)
+    parser.add_argument("--selection-peer-coef", type=float, default=2.0)
     parser.add_argument("--own-coef", type=float, default=0.35)
     parser.add_argument("--lambda-power", type=float, default=0.0)
     parser.add_argument("--success-threshold", type=float, default=0.82)
@@ -588,8 +689,10 @@ def main() -> None:
 
     ablation = run_ablation(args, outdir)
     restart = run_restart(args, outdir)
+    selection = run_restart_selection(args, outdir)
     plot_ablation(ablation, outdir)
     plot_restart(restart, outdir)
+    plot_restart_selection(selection, outdir)
 
     if not args.skip_basin:
         basin = run_basin(args, outdir)
